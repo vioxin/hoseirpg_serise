@@ -3,455 +3,485 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>ほうせいRPG4 〜社畜の伝説〜</title>
+<title>ほうせいRPG4 Tablet Edition</title>
 <style>
     @import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
 
     :root {
-        --bg-color: #1a1a1a;
-        --game-bg: #000;
-        --ui-border: #fff;
+        --bg-color: #202020;
     }
 
     body {
         background: var(--bg-color);
         margin: 0;
         height: 100vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        width: 100vw;
         overflow: hidden;
         font-family: 'DotGothic16', sans-serif;
         color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        touch-action: none; /* ダブルタップ拡大などを防止 */
     }
 
-    /* ゲーム画面のコンテナ（ブラウン管風エフェクト用） */
-    #game-container {
+    #game-wrapper {
         position: relative;
-        width: 640px;
-        height: 480px;
-        background: var(--game-bg);
-        border: 4px solid #444;
-        box-shadow: 0 0 20px rgba(0,0,0,0.8);
-        image-rendering: pixelated; /* ドットをくっきり */
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: #000;
     }
 
     canvas {
         display: block;
-        width: 100%;
-        height: 100%;
+        image-rendering: pixelated; /* ドットをくっきり表示 */
+        box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        max-width: 100%;
+        max-height: 100%;
     }
 
-    /* UIオーバーレイ（メッセージウィンドウなど） */
+    /* UIオーバーレイ */
     #ui-layer {
         position: absolute;
         top: 0; left: 0; width: 100%; height: 100%;
         pointer-events: none;
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-end;
-    }
-
-    .message-box {
-        background: rgba(0, 0, 0, 0.85);
-        border: 4px solid #fff;
-        border-radius: 4px;
-        margin: 20px;
-        padding: 15px;
-        min-height: 100px;
-        font-size: 20px;
-        line-height: 1.5;
-        text-shadow: 2px 2px 0 #000;
-        display: none; /* JSで制御 */
     }
 
     .status-bar {
         position: absolute;
-        top: 0; left: 0; width: 100%;
-        background: rgba(0,0,0,0.7);
-        padding: 5px 10px;
+        top: 10px; left: 10px;
+        background: rgba(0, 0, 0, 0.8);
+        border: 2px solid #fff;
+        border-radius: 8px;
+        padding: 8px 16px;
+        font-size: 20px;
+        text-shadow: 2px 2px 0 #000;
         display: flex;
         gap: 20px;
-        font-size: 16px;
-        border-bottom: 2px solid #fff;
     }
 
-    /* スマホ用コントローラー */
-    #mobile-controls {
-        position: fixed;
+    .msg-box {
+        position: absolute;
+        bottom: 20px; left: 50%;
+        transform: translateX(-50%);
+        width: 80%;
+        background: rgba(0, 0, 0, 0.9);
+        border: 4px solid #fff;
+        border-radius: 8px;
+        padding: 20px;
+        font-size: 24px;
+        line-height: 1.5;
+        display: none;
+    }
+
+    /* タブレット・スマホ用コントローラー */
+    #touch-controls {
+        position: absolute;
         bottom: 20px; left: 20px; right: 20px;
-        height: 120px;
-        display: none; /* PCでは非表示 */
+        height: 180px;
         pointer-events: auto;
+        display: flex;
         justify-content: space-between;
-        z-index: 100;
+        align-items: center;
+        opacity: 0.6;
+        transition: opacity 0.3s;
     }
-    @media (max-width: 800px) {
-        #game-container { width: 100%; height: 60vh; border: none; }
-        #mobile-controls { display: flex; }
-    }
+    #touch-controls:active { opacity: 1; }
 
-    .dpad {
-        position: relative; width: 120px; height: 120px;
+    .dpad-area {
+        position: relative;
+        width: 180px; height: 180px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 50%;
+        border: 2px solid rgba(255,255,255,0.3);
     }
+    
     .dbtn {
-        position: absolute; width: 40px; height: 40px;
-        background: rgba(255,255,255,0.2);
-        border: 2px solid rgba(255,255,255,0.5);
+        position: absolute; width: 60px; height: 60px;
+        cursor: pointer;
     }
-    .dbtn:active { background: rgba(255,255,255,0.5); }
-    .btn-u { top: 0; left: 40px; }
-    .btn-d { bottom: 0; left: 40px; }
-    .btn-l { top: 40px; left: 0; }
-    .btn-r { top: 40px; right: 0; }
+    /* 十字キーの配置 */
+    .btn-u { top: 0; left: 60px; }
+    .btn-d { bottom: 0; left: 60px; }
+    .btn-l { top: 60px; left: 0; }
+    .btn-r { top: 60px; right: 0; }
 
     .action-btn {
-        width: 80px; height: 80px;
-        background: rgba(255,0,0,0.3);
-        border: 2px solid rgba(255,100,100,0.8);
+        width: 100px; height: 100px;
+        background: rgba(255, 50, 50, 0.3);
+        border: 4px solid rgba(255, 100, 100, 0.8);
         border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 20px; color: white; margin-top: 20px;
+        display: flex; justify-content: center; align-items: center;
+        font-size: 24px; font-weight: bold;
+        margin-right: 20px;
     }
-    .action-btn:active { background: rgba(255,0,0,0.6); }
+    .action-btn:active { background: rgba(255, 50, 50, 0.6); transform: scale(0.95); }
 
 </style>
 </head>
 <body>
 
-<div id="game-container">
-    <div class="status-bar">
-        <span>LV: <span id="s-lv">1</span></span>
-        <span>HP: <span id="s-hp">100</span></span>
-        <span>¥: <span id="s-money">1000</span></span>
-        <span>JOB: <span id="s-job">ニート</span></span>
-    </div>
-    <canvas id="gameCanvas" width="320" height="240"></canvas>
+<div id="game-wrapper">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
     
     <div id="ui-layer">
-        <div id="msg-box" class="message-box"></div>
+        <div class="status-bar">
+            <span>LV:<span id="ui-lv">1</span></span>
+            <span>HP:<span id="ui-hp">100</span></span>
+            <span>¥:<span id="ui-money">1000</span></span>
+        </div>
+        <div id="msg-box" class="msg-box"></div>
     </div>
-</div>
 
-<div id="mobile-controls">
-    <div class="dpad">
-        <div class="dbtn btn-u" ontouchstart="input.setDir('UP')" ontouchend="input.stopDir()"></div>
-        <div class="dbtn btn-d" ontouchstart="input.setDir('DOWN')" ontouchend="input.stopDir()"></div>
-        <div class="dbtn btn-l" ontouchstart="input.setDir('LEFT')" ontouchend="input.stopDir()"></div>
-        <div class="dbtn btn-r" ontouchstart="input.setDir('RIGHT')" ontouchend="input.stopDir()"></div>
+    <div id="touch-controls">
+        <div class="dpad-area">
+            <div class="dbtn btn-u" onpointerdown="input.setDir(0)" onpointerup="input.stopDir()" onpointerleave="input.stopDir()"></div>
+            <div class="dbtn btn-d" onpointerdown="input.setDir(2)" onpointerup="input.stopDir()" onpointerleave="input.stopDir()"></div>
+            <div class="dbtn btn-l" onpointerdown="input.setDir(3)" onpointerup="input.stopDir()" onpointerleave="input.stopDir()"></div>
+            <div class="dbtn btn-r" onpointerdown="input.setDir(1)" onpointerup="input.stopDir()" onpointerleave="input.stopDir()"></div>
+        </div>
+        <div class="action-btn" onpointerdown="input.setAction()" onpointerup="input.stopAction()">A</div>
     </div>
-    <div class="action-btn" ontouchstart="input.setAction()" ontouchend="input.stopAction()">A</div>
 </div>
 
 <script>
 /**
- * ほうせいRPG4 Core Engine
- * Canvas APIを使用した本格的RPGエンジン
+ * ほうせいRPG4 High-Res Engine
+ * ドット絵生成システム＆アニメーション
  */
 
-// --- Constants ---
-const TILE_SIZE = 32;
-const SCREEN_W = 320;
-const SCREEN_H = 240;
-const MAP_W = 40;
-const MAP_H = 40;
+const CFG = {
+    TILE_SIZE: 48, // 解像度アップ
+    SCREEN_W: 800,
+    SCREEN_H: 600,
+    MAP_W: 50,
+    MAP_H: 50,
+    SPEED: 4 // 移動速度
+};
 
-// タイル定義 (色と属性)
 const TILES = {
     GRASS: { id: 0, color: '#4caf50', walk: true },
     WATER: { id: 1, color: '#2196f3', walk: false },
-    WALL:  { id: 2, color: '#795548', walk: false }, // 木や壁
-    FLOOR: { id: 3, color: '#9e9e9e', walk: true },  // コンクリ
-    DESK:  { id: 4, color: '#5d4037', walk: false }, // 机
-    
-    // イベント用特殊タイル
+    WALL:  { id: 2, color: '#795548', walk: false },
+    FLOOR: { id: 3, color: '#9e9e9e', walk: true },
     SHOP:  { id: 10, color: '#ff9800', walk: false },
-    BED:   { id: 11, color: '#e91e63', walk: false },
-    PC:    { id: 12, color: '#607d8b', walk: false }
+    HOME:  { id: 11, color: '#e91e63', walk: false }
 };
 
-// --- Global State ---
+// --- Sprite Generator (High Resolution Pixel Art) ---
+// 画像を使わず、文字配列からドット絵を生成する関数
+const Sprites = {};
+
+function createPixelSprite(key, width, height, palette, pixelData) {
+    const c = document.createElement('canvas');
+    c.width = width * 4; // 内部解像度を上げておいて縮小表示（あるいはそのまま）
+    c.height = height * 4;
+    const ctx = c.getContext('2d');
+    const dotSize = 4; // 1ドットの大きさ
+
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const colorIndex = parseInt(pixelData[y][x]);
+            if (colorIndex > 0) {
+                ctx.fillStyle = palette[colorIndex];
+                ctx.fillRect(x * dotSize, y * dotSize, dotSize, dotSize);
+            }
+        }
+    }
+    Sprites[key] = c;
+}
+
+function initGraphics() {
+    // パレット: 0:透, 1:黒線, 2:肌, 3:服青, 4:服水, 5:靴, 6:髪
+    const pPal = [null, '#222', '#ffcc80', '#1565c0', '#42a5f5', '#5d4037', '#3e2723'];
+    
+    // プレイヤー正面 (12x12ドット)
+    const pDataWait = [
+        "000000000000",
+        "000066660000",
+        "000666666000",
+        "000622226000",
+        "000212212000", // 目
+        "000222222000",
+        "000333333000",
+        "003433334300",
+        "003433334300",
+        "000333333000",
+        "000330033000",
+        "005550055500"
+    ];
+    createPixelSprite('player_wait', 12, 12, pPal, pDataWait);
+
+    // プレイヤー歩き1 (右足出し)
+    const pDataWalk1 = [...pDataWait];
+    pDataWalk1[10] = "000330000000"; // 左足残し
+    pDataWalk1[11] = "005550005500"; // 右足上げ
+    createPixelSprite('player_walk1', 12, 12, pPal, pDataWalk1);
+
+    // プレイヤー歩き2 (左足出し)
+    const pDataWalk2 = [...pDataWait];
+    pDataWalk2[10] = "000000033000"; 
+    pDataWalk2[11] = "005500055500";
+    createPixelSprite('player_walk2', 12, 12, pPal, pDataWalk2);
+
+    // マップチップ：草 (12x12)
+    // 0:透, 1:濃緑, 2:薄緑
+    const gPal = [null, '#388e3c', '#81c784']; 
+    const gData = [
+        "222222222222",
+        "221222221222",
+        "211122211122",
+        "221222221222",
+        "222222222222",
+        "222212222222",
+        "222111222222",
+        "222212222222",
+        "222222222222",
+        "212222212222",
+        "111222111222",
+        "212222212222"
+    ];
+    createPixelSprite('grass', 12, 12, gPal, gData);
+    
+    // レンガ壁
+    const wPal = [null, '#5d4037', '#8d6e63', '#a1887f'];
+    const wData = [
+        "222222122222",
+        "223332123332",
+        "223332123332",
+        "111111111111",
+        "221222222122",
+        "321233332123",
+        "321233332123",
+        "111111111111",
+        "222221222222",
+        "233321233332",
+        "233321233332",
+        "111111111111"
+    ];
+    createPixelSprite('wall', 12, 12, wPal, wData);
+}
+
+// --- Game State ---
 const state = {
     player: {
-        x: 5 * TILE_SIZE, // ピクセル単位の座標
-        y: 5 * TILE_SIZE,
+        x: 5 * CFG.TILE_SIZE,
+        y: 5 * CFG.TILE_SIZE,
         dir: 2, // 0:上, 1:右, 2:下, 3:左
-        speed: 2, // 移動速度
         moving: false,
-        lv: 1, hp: 100, maxHp: 100, money: 1000, job: 'ニート'
+        animFrame: 0, // 0~3 (アニメーション用)
+        animTimer: 0
     },
     camera: { x: 0, y: 0 },
-    map: [],
-    events: []
+    map: []
 };
 
-// --- Graphics Generator (擬似スプライト生成) ---
-// 画像ファイルなしでリッチな見た目にするため、オフスクリーンCanvasに描画
-const assets = {};
-
-function createAsset(key, drawFn) {
-    const c = document.createElement('canvas');
-    c.width = TILE_SIZE;
-    c.height = TILE_SIZE;
-    const ctx = c.getContext('2d');
-    drawFn(ctx);
-    assets[key] = c;
-}
-
-function initAssets() {
-    // プレイヤー (顔)
-    createAsset('player', (ctx) => {
-        ctx.fillStyle = '#ffcc80'; // 肌
-        ctx.fillRect(4, 4, 24, 24);
-        ctx.fillStyle = '#000'; // 目
-        ctx.fillRect(8, 10, 4, 4);
-        ctx.fillRect(20, 10, 4, 4);
-        ctx.fillStyle = '#d32f2f'; // 口
-        ctx.fillRect(10, 20, 12, 2);
-    });
-
-    // 草
-    createAsset('grass', (ctx) => {
-        ctx.fillStyle = '#4caf50';
-        ctx.fillRect(0,0,32,32);
-        ctx.fillStyle = '#81c784'; // 模様
-        ctx.fillRect(4,4,4,4); ctx.fillRect(20,20,6,6);
-    });
-    
-    // 壁（レンガ）
-    createAsset('wall', (ctx) => {
-        ctx.fillStyle = '#795548';
-        ctx.fillRect(0,0,32,32);
-        ctx.strokeStyle = '#5d4037';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(2,2,28,28);
-        ctx.beginPath(); ctx.moveTo(0,16); ctx.lineTo(32,16); ctx.stroke();
-    });
-
-    // 水
-    createAsset('water', (ctx) => {
-        ctx.fillStyle = '#2196f3';
-        ctx.fillRect(0,0,32,32);
-        ctx.fillStyle = '#64b5f6'; // 波
-        ctx.fillRect(5,10,10,2); ctx.fillRect(18,20,10,2);
-    });
-}
-
-// --- Map System ---
+// --- Core Systems ---
 function generateMap() {
-    // シンプルなマップ生成 (周囲を壁、中をランダム)
-    for(let y=0; y<MAP_H; y++) {
+    for(let y=0; y<CFG.MAP_H; y++) {
         let row = [];
-        for(let x=0; x<MAP_W; x++) {
-            if(x===0 || x===MAP_W-1 || y===0 || y===MAP_H-1) {
-                row.push(TILES.WALL.id);
-            } else {
+        for(let x=0; x<CFG.MAP_W; x++) {
+            if(x===0 || x===CFG.MAP_W-1 || y===0 || y===CFG.MAP_H-1) row.push(TILES.WALL.id);
+            else {
                 let r = Math.random();
-                if(r < 0.1) row.push(TILES.WALL.id);
-                else if(r < 0.15) row.push(TILES.WATER.id);
+                if(r < 0.05) row.push(TILES.WALL.id);
+                else if(r < 0.1) row.push(TILES.WATER.id);
                 else row.push(TILES.GRASS.id);
             }
         }
         state.map.push(row);
     }
-    // 特定の建物（イベント用）
-    state.map[4][8] = TILES.SHOP.id; // 店
-    state.map[6][6] = TILES.BED.id;  // 家のベッド
+    state.map[6][6] = TILES.SHOP.id;
+    state.map[8][8] = TILES.HOME.id;
 }
 
-function getTileAt(pixelX, pixelY) {
-    const tx = Math.floor(pixelX / TILE_SIZE);
-    const ty = Math.floor(pixelY / TILE_SIZE);
-    if(tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return TILES.WALL;
-    
-    const id = state.map[ty][tx];
-    return Object.values(TILES).find(t => t.id === id) || TILES.GRASS;
-}
-
-// --- Input Handling ---
 const input = {
-    keys: { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, z: false },
-    dir: null,
+    dir: -1, // -1:なし, 0~3:方向
     action: false,
-
-    init: function() {
-        window.addEventListener('keydown', e => {
-            if(this.keys.hasOwnProperty(e.key)) this.keys[e.key] = true;
-            if(e.key === 'z' || e.key === 'Enter') this.action = true;
-        });
-        window.addEventListener('keyup', e => {
-            if(this.keys.hasOwnProperty(e.key)) this.keys[e.key] = false;
-            if(e.key === 'z' || e.key === 'Enter') this.action = false;
-        });
-    },
-    
-    // Mobile Touch
-    setDir: function(d) {
-        if(d==='UP') this.keys.ArrowUp = true;
-        if(d==='DOWN') this.keys.ArrowDown = true;
-        if(d==='LEFT') this.keys.ArrowLeft = true;
-        if(d==='RIGHT') this.keys.ArrowRight = true;
-    },
-    stopDir: function() {
-        this.keys.ArrowUp = false; this.keys.ArrowDown = false;
-        this.keys.ArrowLeft = false; this.keys.ArrowRight = false;
-    },
+    setDir: function(d) { this.dir = d; },
+    stopDir: function() { this.dir = -1; },
     setAction: function() { this.action = true; },
     stopAction: function() { this.action = false; }
 };
 
-// --- Game Logic ---
+// PCキーボード対応
+window.addEventListener('keydown', e => {
+    if(e.key === 'ArrowUp') input.setDir(0);
+    if(e.key === 'ArrowDown') input.setDir(2);
+    if(e.key === 'ArrowLeft') input.setDir(3);
+    if(e.key === 'ArrowRight') input.setDir(1);
+    if(e.key === 'z' || e.key === 'Enter') input.setAction();
+});
+window.addEventListener('keyup', e => {
+    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) input.stopDir();
+    if(e.key === 'z' || e.key === 'Enter') input.stopAction();
+});
+
 function update() {
     const p = state.player;
-    let dx = 0;
-    let dy = 0;
+    let dx = 0, dy = 0;
 
-    // 移動処理（グリッド単位で動くRPGらしさ）
-    // 今回は「スムーズ移動だが当たり判定はグリッド」にするハイブリッド
-    
-    if (input.keys.ArrowUp) { dy = -p.speed; p.dir = 0; }
-    else if (input.keys.ArrowDown) { dy = p.speed; p.dir = 2; }
-    else if (input.keys.ArrowLeft) { dx = -p.speed; p.dir = 3; }
-    else if (input.keys.ArrowRight) { dx = p.speed; p.dir = 1; }
+    // 入力処理
+    if (input.dir !== -1) {
+        p.dir = input.dir;
+        if(p.dir === 0) dy = -CFG.SPEED;
+        if(p.dir === 2) dy = CFG.SPEED;
+        if(p.dir === 3) dx = -CFG.SPEED;
+        if(p.dir === 1) dx = CFG.SPEED;
+        
+        p.moving = true;
+    } else {
+        p.moving = false;
+        p.animFrame = 0; // 止まったら棒立ち
+    }
 
+    // 移動と衝突判定
     if (dx !== 0 || dy !== 0) {
-        // 当たり判定 (移動先の四隅をチェック)
-        const margin = 4; // キャラクターのサイズを少し小さく判定
+        const margin = 12; // 当たり判定のマージン
         const nextX = p.x + dx;
         const nextY = p.y + dy;
         
-        // 簡易的な衝突判定
-        const tl = getTileAt(nextX + margin, nextY + margin); // TopLeft
-        const br = getTileAt(nextX + TILE_SIZE - margin, nextY + TILE_SIZE - margin); // BottomRight
-        
-        if (tl.walk && br.walk) {
+        // 四隅チェック
+        const check = (x, y) => {
+            let tx = Math.floor(x / CFG.TILE_SIZE);
+            let ty = Math.floor(y / CFG.TILE_SIZE);
+            if(tx<0||tx>=CFG.MAP_W||ty<0||ty>=CFG.MAP_H) return false;
+            let tid = state.map[ty][tx];
+            return Object.values(TILES).find(t=>t.id===tid).walk;
+        };
+
+        let canMove = 
+            check(nextX + margin, nextY + margin) &&
+            check(nextX + CFG.TILE_SIZE - margin, nextY + margin) &&
+            check(nextX + margin, nextY + CFG.TILE_SIZE - margin) &&
+            check(nextX + CFG.TILE_SIZE - margin, nextY + CFG.TILE_SIZE - margin);
+
+        if (canMove) {
             p.x = nextX;
             p.y = nextY;
-            p.moving = true;
+            
+            // アニメーション更新
+            p.animTimer++;
+            if(p.animTimer > 8) { // 8フレームごとに足踏み
+                p.animTimer = 0;
+                p.animFrame = (p.animFrame + 1) % 4; // 0, 1, 2, 3 のループ
+                // 0:静止, 1:右足, 2:静止, 3:左足 というサイクルにする
+            }
         }
-    } else {
-        p.moving = false;
     }
 
-    // カメラ更新 (プレイヤー中心)
-    state.camera.x = p.x - SCREEN_W / 2 + TILE_SIZE / 2;
-    state.camera.y = p.y - SCREEN_H / 2 + TILE_SIZE / 2;
+    // カメラ
+    state.camera.x = p.x - CFG.SCREEN_W/2 + CFG.TILE_SIZE/2;
+    state.camera.y = p.y - CFG.SCREEN_H/2 + CFG.TILE_SIZE/2;
+    state.camera.x = Math.max(0, Math.min(state.camera.x, CFG.MAP_W * CFG.TILE_SIZE - CFG.SCREEN_W));
+    state.camera.y = Math.max(0, Math.min(state.camera.y, CFG.MAP_H * CFG.TILE_SIZE - CFG.SCREEN_H));
 
-    // 画面外に行かないようにクランプ
-    state.camera.x = Math.max(0, Math.min(state.camera.x, MAP_W * TILE_SIZE - SCREEN_W));
-    state.camera.y = Math.max(0, Math.min(state.camera.y, MAP_H * TILE_SIZE - SCREEN_H));
-
-    // アクション判定 (Zキー)
     if(input.action) {
-        checkInteraction();
-        input.action = false; // 連打防止
+        checkEvent();
+        input.action = false;
     }
 }
 
-function checkInteraction() {
+function checkEvent() {
     const p = state.player;
-    // 向いている方向の1マス先を取得
-    let tx = Math.floor((p.x + TILE_SIZE/2) / TILE_SIZE);
-    let ty = Math.floor((p.y + TILE_SIZE/2) / TILE_SIZE);
-    
-    if(p.dir === 0) ty--;
-    if(p.dir === 1) tx++;
-    if(p.dir === 2) ty++;
-    if(p.dir === 3) tx--;
+    let tx = Math.floor((p.x + CFG.TILE_SIZE/2) / CFG.TILE_SIZE);
+    let ty = Math.floor((p.y + CFG.TILE_SIZE/2) / CFG.TILE_SIZE);
+    // 向いている方角
+    if(p.dir===0) ty--; if(p.dir===2) ty++;
+    if(p.dir===3) tx--; if(p.dir===1) tx++;
 
-    const targetId = state.map[ty][tx];
+    if(tx<0||tx>=CFG.MAP_W||ty<0||ty>=CFG.MAP_H) return;
+    const tid = state.map[ty][tx];
     
-    if(targetId === TILES.SHOP.id) showMessage("コンビニだ。\\n夜勤の店員が死んだ目をしている。");
-    else if(targetId === TILES.BED.id) showMessage("万年床だ。\\n寝ればHP回復できる…かもしれない。");
-    else if(targetId === TILES.WALL.id) showMessage("壁だ。乗り越えられない壁だ。");
-    else showMessage(""); // メッセージを消す
-}
-
-// --- UI System ---
-const ui = {
-    msgBox: document.getElementById('msg-box'),
-    showMsg: function(text) {
-        if(!text) {
-            this.msgBox.style.display = 'none';
-            return;
-        }
-        this.msgBox.style.display = 'block';
-        this.msgBox.innerHTML = text.replace(/\\n/g, '<br>');
+    const msg = document.getElementById('msg-box');
+    if(tid === TILES.SHOP.id) {
+        msg.style.display = 'block';
+        msg.innerHTML = "コンビニだ。<br>深夜バイト募集中 (時給950円)";
+    } else if(tid === TILES.HOME.id) {
+        msg.style.display = 'block';
+        msg.innerHTML = "実家だ。<br>お母さん「あんた、いつ働くの？」";
+    } else {
+        msg.style.display = 'none';
     }
-};
-
-function showMessage(text) {
-    ui.showMsg(text);
 }
 
-// --- Renderer ---
+// --- Render ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-// ドット絵をくっきりさせる
-ctx.imageSmoothingEnabled = false; 
+ctx.imageSmoothingEnabled = false;
 
 function draw() {
-    // 画面クリア
+    // 背景
     ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
+    ctx.fillRect(0,0,CFG.SCREEN_W, CFG.SCREEN_H);
 
-    // タイル描画範囲の計算
-    const startCol = Math.floor(state.camera.x / TILE_SIZE);
-    const endCol = startCol + (SCREEN_W / TILE_SIZE) + 1;
-    const startRow = Math.floor(state.camera.y / TILE_SIZE);
-    const endRow = startRow + (SCREEN_H / TILE_SIZE) + 1;
-    
-    const offsetX = -state.camera.x + startCol * TILE_SIZE;
-    const offsetY = -state.camera.y + startRow * TILE_SIZE;
+    // タイル描画
+    const startX = Math.floor(state.camera.x / CFG.TILE_SIZE);
+    const endX = startX + (CFG.SCREEN_W / CFG.TILE_SIZE) + 1;
+    const startY = Math.floor(state.camera.y / CFG.TILE_SIZE);
+    const endY = startY + (CFG.SCREEN_H / CFG.TILE_SIZE) + 1;
 
-    for (let c = startCol; c <= endCol; c++) {
-        for (let r = startRow; r <= endRow; r++) {
-            if (c >= 0 && c < MAP_W && r >= 0 && r < MAP_H) {
-                let tileId = state.map[r][c];
-                let tile = Object.values(TILES).find(t => t.id === tileId);
-                let x = (c - startCol) * TILE_SIZE + offsetX;
-                let y = (r - startRow) * TILE_SIZE + offsetY;
+    for(let y=startY; y<=endY; y++) {
+        for(let x=startX; x<=endX; x++) {
+            if(y>=0 && y<CFG.MAP_H && x>=0 && x<CFG.MAP_W) {
+                let tid = state.map[y][x];
+                let px = Math.floor(x * CFG.TILE_SIZE - state.camera.x);
+                let py = Math.floor(y * CFG.TILE_SIZE - state.camera.y);
                 
-                // アセットがあれば画像、なければ単色
-                if(tileId === TILES.GRASS.id) ctx.drawImage(assets.grass, x, y);
-                else if(tileId === TILES.WALL.id) ctx.drawImage(assets.wall, x, y);
-                else if(tileId === TILES.WATER.id) ctx.drawImage(assets.water, x, y);
+                // 画像描画 (48x48に拡大して描画)
+                if(tid === TILES.GRASS.id) ctx.drawImage(Sprites.grass, px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
+                else if(tid === TILES.WALL.id) ctx.drawImage(Sprites.wall, px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
                 else {
-                    ctx.fillStyle = tile ? tile.color : '#000';
-                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                    let c = Object.values(TILES).find(t=>t.id===tid).color;
+                    ctx.fillStyle = c;
+                    ctx.fillRect(px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
                 }
             }
         }
     }
 
     // プレイヤー描画
-    const px = state.player.x - state.camera.x;
-    const py = state.player.y - state.camera.y;
-    ctx.drawImage(assets.player, px, py);
+    const px = Math.floor(state.player.x - state.camera.x);
+    const py = Math.floor(state.player.y - state.camera.y);
     
-    // デバッグ用: 向き表示
-    /*
-    ctx.fillStyle = 'red';
-    if(state.player.dir===0) ctx.fillRect(px+14, py, 4, 4);
-    if(state.player.dir===1) ctx.fillRect(px+28, py+14, 4, 4);
-    if(state.player.dir===2) ctx.fillRect(px+14, py+28, 4, 4);
-    if(state.player.dir===3) ctx.fillRect(px, py+14, 4, 4);
-    */
+    // アニメーションフレーム選択
+    // サイクル: 0(静) -> 1(右足) -> 2(静) -> 3(左足)
+    let spriteName = 'player_wait';
+    if(state.player.animFrame === 1) spriteName = 'player_walk1';
+    if(state.player.animFrame === 3) spriteName = 'player_walk2';
+    
+    // 影
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath();
+    ctx.ellipse(px+24, py+40, 16, 6, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // キャラ本体
+    // 向きによって反転させたいが、今回は簡易的に全て正面素材を使用
+    // (本格的にするならSpritesにRight/Backを追加する)
+    ctx.drawImage(Sprites[spriteName], px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
 }
 
-// --- Main Loop ---
-function gameLoop() {
+function loop() {
     update();
     draw();
-    requestAnimationFrame(gameLoop);
+    requestAnimationFrame(loop);
 }
 
-// --- Init ---
 window.onload = function() {
-    initAssets();
+    // 画面サイズ調整
+    const fit = () => {
+        const wrap = document.getElementById('game-wrapper');
+        // CSSでobject-fit管理しているので、Canvas解像度は固定でOK
+    };
+    window.addEventListener('resize', fit);
+    
+    initGraphics();
     generateMap();
-    input.init();
-    gameLoop();
+    loop();
 };
 
 </script>

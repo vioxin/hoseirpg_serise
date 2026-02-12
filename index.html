@@ -3,16 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>ほうせいRPG4 Tablet Edition - Full Life</title>
+<title>ほうせいRPG4 Tablet Edition</title>
 <style>
     @import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
 
-    :root { --bg-color: #202020; --win-bg: rgba(0,0,0,0.9); --win-border: #fff; }
+    :root { --bg-color: #202020; --win-bg: rgba(0,0,0,0.95); --win-border: #fff; }
 
     body {
         background: var(--bg-color); margin: 0; height: 100vh; width: 100vw; overflow: hidden;
         font-family: 'DotGothic16', sans-serif; color: white;
         display: flex; justify-content: center; align-items: center; touch-action: none;
+        user-select: none; -webkit-user-select: none;
     }
 
     #game-wrapper {
@@ -54,29 +55,40 @@
     .msg-box {
         position: absolute; bottom: 180px; left: 50%; transform: translateX(-50%);
         width: 80%; background: var(--win-bg); border: 2px solid var(--win-border); border-radius: 8px;
-        padding: 15px; font-size: 20px; line-height: 1.4; display: none; text-align: left;
+        padding: 15px; font-size: 20px; line-height: 1.4; display: none; text-align: center;
+        white-space: pre-wrap;
     }
 
-    /* コントローラー */
-    #touch-controls {
-        position: absolute; bottom: 20px; left: 20px; right: 20px; height: 160px;
-        pointer-events: auto; display: flex; justify-content: space-between; align-items: center; opacity: 0.7;
+    /* コントローラーエリア */
+    #controls-layer {
+        position: absolute; bottom: 20px; left: 20px; right: 20px; height: 150px;
+        pointer-events: auto; display: flex; justify-content: space-between; align-items: flex-end;
     }
-    .dpad-area {
-        position: relative; width: 160px; height: 160px;
-        background: rgba(255,255,255,0.1); border-radius: 50%; border: 2px solid rgba(255,255,255,0.3);
-    }
-    .dbtn { position: absolute; width: 55px; height: 55px; cursor: pointer; }
-    .btn-u { top: 0; left: 52px; } .btn-d { bottom: 0; left: 52px; }
-    .btn-l { top: 52px; left: 0; } .btn-r { top: 52px; right: 0; }
 
+    /* ジョイスティック */
+    #joystick-zone {
+        position: relative; width: 150px; height: 150px;
+        background: rgba(255, 255, 255, 0.1); border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        touch-action: none;
+    }
+    #joystick-knob {
+        position: absolute; top: 50%; left: 50%; width: 60px; height: 60px;
+        background: rgba(255, 255, 255, 0.5); border-radius: 50%;
+        transform: translate(-50%, -50%); box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        pointer-events: none;
+    }
+
+    /* Aボタン */
     .action-btn {
-        width: 90px; height: 90px; background: rgba(255, 50, 50, 0.3);
+        width: 90px; height: 90px; background: rgba(255, 50, 50, 0.4);
         border: 4px solid rgba(255, 100, 100, 0.8); border-radius: 50%;
         display: flex; justify-content: center; align-items: center;
-        font-size: 24px; font-weight: bold; margin-right: 10px;
+        font-size: 28px; font-weight: bold; margin-bottom: 10px; margin-right: 10px;
+        user-select: none;
     }
-    .action-btn:active { background: rgba(255, 50, 50, 0.6); transform: scale(0.95); }
+    .action-btn:active { background: rgba(255, 50, 50, 0.7); transform: scale(0.95); }
+
 </style>
 </head>
 <body>
@@ -105,46 +117,49 @@
         <div id="msg-box" class="msg-box"></div>
     </div>
 
-    <div id="touch-controls">
-        <div class="dpad-area">
-            <div class="dbtn btn-u" onpointerdown="input.setDir(0)" onpointerup="input.stopDir()" onpointerleave="input.stopDir()"></div>
-            <div class="dbtn btn-d" onpointerdown="input.setDir(2)" onpointerup="input.stopDir()" onpointerleave="input.stopDir()"></div>
-            <div class="dbtn btn-l" onpointerdown="input.setDir(3)" onpointerup="input.stopDir()" onpointerleave="input.stopDir()"></div>
-            <div class="dbtn btn-r" onpointerdown="input.setDir(1)" onpointerup="input.stopDir()" onpointerleave="input.stopDir()"></div>
+    <div id="controls-layer">
+        <div id="joystick-zone">
+            <div id="joystick-knob"></div>
         </div>
         <div class="action-btn" onpointerdown="input.setAction()" onpointerup="input.stopAction()">A</div>
     </div>
 </div>
 
 <script>
-/* ほうせいRPG4 High-Res Engine - Enhanced */
+/**
+ * ほうせいRPG4 Remastered
+ * - Joystick Support
+ * - Enhanced Interaction (Proximity check)
+ * - Improved Graphics
+ * - Bug Fixes (Respawn position)
+ */
 
 const CFG = {
     TILE_SIZE: 48,
     SCREEN_W: 800, SCREEN_H: 600,
-    MAP_W: 40, MAP_H: 30, // 街マップサイズ
-    SPEED: 5
+    SPEED: 6 
 };
 
+// 0:上, 1:右, 2:下, 3:左
 const TILES = {
-    GRASS: { id: 0, color: '#4caf50', walk: true },
-    WATER: { id: 1, color: '#2196f3', walk: false },
-    WALL:  { id: 2, color: '#795548', walk: false }, // 木の幹など
-    ROAD:  { id: 3, color: '#616161', walk: true },
-    FLOOR: { id: 4, color: '#d7ccc8', walk: true },  // 室内床
+    GRASS: { id: 0, walk: true },
+    WATER: { id: 1, walk: false },
+    WALL:  { id: 2, walk: false },
+    ROAD:  { id: 3, walk: true },
+    FLOOR: { id: 4, walk: true },
     
-    // 建物・家具 (ID 10~)
-    SHOP:    { id: 10, color: '#ff9800', walk: false },
-    OFFICE:  { id: 11, color: '#607d8b', walk: false },
-    HOME:    { id: 12, color: '#3e2723', walk: false },
+    // 建物 (壁扱い)
+    SHOP:    { id: 10, walk: false, type: 'build' }, 
+    OFFICE:  { id: 11, walk: false, type: 'build' },
+    HOME:    { id: 12, walk: false, type: 'build' },
     
-    // 室内オブジェクト
-    BED:     { id: 20, color: '#ef5350', walk: true }, // ベッドは乗れる
-    DESK:    { id: 21, color: '#8d6e63', walk: false },
-    EXIT:    { id: 99, color: '#000',    walk: true }  // 出口
+    // 家具
+    BED:     { id: 20, walk: true, type: 'obj' },
+    DESK:    { id: 21, walk: false, type: 'obj' }, // 机は乗れない
+    EXIT:    { id: 99, walk: true }
 };
 
-// --- Sprite Generator ---
+// --- Graphics Engine ---
 const Sprites = {};
 
 function createPixelSprite(key, width, height, palette, pixelData) {
@@ -152,7 +167,6 @@ function createPixelSprite(key, width, height, palette, pixelData) {
     c.width = width * 4; c.height = height * 4;
     const ctx = c.getContext('2d');
     const dotSize = 4;
-
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
             const colorIndex = parseInt(pixelData[y][x]);
@@ -166,58 +180,64 @@ function createPixelSprite(key, width, height, palette, pixelData) {
 }
 
 function initGraphics() {
-    // 共通パレット: 0:透, 1:黒, 2:肌, 3:青, 4:水, 5:茶, 6:白, 7:赤, 8:緑, 9:グレー
-    const pal = [null, '#222', '#ffcc80', '#1565c0', '#42a5f5', '#5d4037', '#fff', '#ef5350', '#2e7d32', '#90a4ae'];
+    // パレット: 0:透, 1:黒, 2:肌, 3:青, 4:水, 5:茶, 6:白, 7:赤, 8:緑, 9:灰, A:橙, B:黄
+    const pal = [null, '#222', '#ffcc80', '#1565c0', '#42a5f5', '#5d4037', '#fff', '#ef5350', '#388e3c', '#757575', '#ff9800', '#fbc02d'];
     
-    // 12x12ドット絵データ定義
-    
-    // プレイヤー(正面)
-    const pWait = [
+    // プレイヤー
+    createPixelSprite('player_wait', 12, 12, pal, [
         "000000000000", "000011110000", "000111111000", "000122221000",
         "000212212000", "000222222000", "000333333000", "003433334300",
         "003433334300", "000333333000", "000330033000", "005550055500"
-    ];
-    createPixelSprite('player_wait', 12, 12, pal, pWait);
+    ]);
     
     // 草
-    const gData = [
+    createPixelSprite('grass', 12, 12, pal, [
         "888888888888", "880888880888", "800088800088", "880888880888",
         "888888888888", "888808888888", "888000888888", "888808888888",
         "888888888888", "808888808888", "000888000888", "808888808888"
-    ];
-    createPixelSprite('grass', 12, 12, pal, gData);
+    ]);
 
-    // 壁(レンガ)
-    const wData = [
+    // 壁
+    createPixelSprite('wall', 12, 12, pal, [
         "555555155555", "550005150005", "550005150005", "111111111111",
         "551555555155", "051500005150", "051500005150", "111111111111",
         "555551555555", "500051500005", "500051500005", "111111111111"
-    ];
-    createPixelSprite('wall', 12, 12, pal, wData);
+    ]);
 
-    // ベッド (シーツ:6, 枕:6, 布団:7)
-    const bedData = [
-        "000000000000", "006666666600", "006666666600", "006666666600",
-        "007777777700", "007777777700", "007777777700", "007777777700",
-        "007777777700", "007777777700", "007777777700", "005000000500"
-    ];
-    createPixelSprite('bed', 12, 12, pal, bedData);
+    // ★コンビニ (分かりやすく: オレンジ看板、ガラス戸、「7」っぽいマーク)
+    createPixelSprite('shop', 12, 12, pal, [
+        "111111111111", "1AAABBBBAAA1", "1AAABBBBAAA1", "111111111111", // 看板
+        "991444444199", "991444444199", "991411114199", "991414414199", // ガラス戸
+        "991414414199", "991414414199", "991414414199", "991111111199"
+    ]);
 
-    // 机 (PC:9, 机:5)
-    const deskData = [
-        "000000000000", "000099990000", "000099990000", "000099990000",
-        "005555555500", "005555555500", "005555555500", "005555555500",
-        "005000000500", "005000000500", "005000000500", "005000000500"
-    ];
-    createPixelSprite('desk', 12, 12, pal, deskData);
+    // ★オフィス (分かりやすく: 高層ビル風、青い窓)
+    createPixelSprite('office', 12, 12, pal, [
+        "999999999999", "933993399339", "933993399339", "999999999999",
+        "933993399339", "933993399339", "999999999999", "933993399339",
+        "933993399339", "999999999999", "911996699119", "911996699119" // 入口自動ドア
+    ]);
     
-    // 家アイコン (マップ用)
-    const homeData = [
+    // 家
+    createPixelSprite('home', 12, 12, pal, [
         "000005000000", "000055500000", "000555550000", "005555555000",
         "055555555500", "050000000500", "050000000500", "050066600500",
         "050066600500", "050066600500", "050000000500", "055555555500"
-    ];
-    createPixelSprite('home', 12, 12, pal, homeData);
+    ]);
+
+    // ベッド
+    createPixelSprite('bed', 12, 12, pal, [
+        "000000000000", "006666666600", "006666666600", "006666666600",
+        "007777777700", "007777777700", "007777777700", "007777777700",
+        "007777777700", "007777777700", "007777777700", "005000000500"
+    ]);
+
+    // 机
+    createPixelSprite('desk', 12, 12, pal, [
+        "000000000000", "000099990000", "000099990000", "000099990000",
+        "005555555500", "005555555500", "005555555500", "005555555500",
+        "005000000500", "005000000500", "005000000500", "005000000500"
+    ]);
 }
 
 // --- Game State ---
@@ -225,15 +245,13 @@ const state = {
     currentMap: 'city',
     player: {
         x: 0, y: 0, dir: 2, moving: false, animFrame: 0, animTimer: 0,
-        // RPG Stats
         lv: 1, hp: 100, maxHp: 100, exp: 0, nextExp: 50, money: 1000
     },
     camera: { x: 0, y: 0 },
-    // マップ切り替え時に戻る場所
-    savedPos: { x: 20, y: 15 } 
+    // 建物に入る直前の安全な座標を保存する
+    savedPos: { x: 0, y: 0 } 
 };
 
-// マップデータ格納用
 const maps = {
     city: { width: 40, height: 30, data: [] },
     home: { width: 8, height: 8, data: [] },
@@ -243,27 +261,30 @@ const maps = {
 
 // --- Map Generation ---
 function generateMaps() {
-    // 1. 街 (City)
+    // 1. City
     const mc = maps.city;
     for(let y=0; y<mc.height; y++) {
         let row = [];
         for(let x=0; x<mc.width; x++) {
             let id = TILES.GRASS.id;
-            // 外壁
             if(x===0||x===mc.width-1||y===0||y===mc.height-1) id = TILES.WALL.id;
-            // 道路
-            else if(x===20 || y===15) id = TILES.ROAD.id;
-            else if(Math.random()<0.05) id = TILES.WALL.id; // 木
+            else if(x===20 || y===16) id = TILES.ROAD.id; // 中央道
             row.push(id);
         }
         mc.data.push(row);
     }
-    // 建物配置
-    mc.data[12][10] = TILES.SHOP.id;   // 左上エリア
-    mc.data[8][25]  = TILES.OFFICE.id; // 右上エリア
-    mc.data[22][25] = TILES.HOME.id;   // 右下エリア (自宅)
+    
+    // 建物配置 (入り口の前は必ず道)
+    const setBuilding = (x, y, id) => {
+        mc.data[y][x] = id;
+        mc.data[y+1][x] = TILES.ROAD.id; 
+    };
 
-    // 2. 自宅 (Home)
+    setBuilding(10, 10, TILES.SHOP.id);   // コンビニ
+    setBuilding(25, 8, TILES.OFFICE.id);  // オフィス
+    setBuilding(25, 22, TILES.HOME.id);   // 自宅
+
+    // 2. Home
     const mh = maps.home;
     for(let y=0; y<mh.height; y++) {
         let row = [];
@@ -275,10 +296,9 @@ function generateMaps() {
         }
         mh.data.push(row);
     }
-    mh.data[1][1] = TILES.BED.id;  // ベッド
-    mh.data[1][5] = TILES.DESK.id; // 机
+    mh.data[1][1] = TILES.BED.id; mh.data[1][5] = TILES.DESK.id;
 
-    // 3. コンビニ (Shop)
+    // 3. Shop
     const ms = maps.shop;
     for(let y=0; y<ms.height; y++) {
         let row = [];
@@ -290,31 +310,29 @@ function generateMaps() {
         }
         ms.data.push(row);
     }
-    ms.data[2][2] = TILES.WALL.id; // 商品棚代わり
-    ms.data[2][3] = TILES.WALL.id;
+    ms.data[2][2] = TILES.WALL.id; ms.data[2][3] = TILES.WALL.id; // 棚
 
-    // 4. オフィス (Office)
+    // 4. Office
     const mo = maps.office;
     for(let y=0; y<mo.height; y++) {
         let row = [];
         for(let x=0; x<mo.width; x++) {
             let id = TILES.FLOOR.id;
-            if(x===0||x===mo.width-1||y===0||y===mo.height-1) id = TILES.OFFICE.id; // 壁
+            if(x===0||x===mo.width-1||y===0||y===mo.height-1) id = TILES.OFFICE.id;
             if(x===6 && y===mo.height-1) id = TILES.EXIT.id;
             row.push(id);
         }
         mo.data.push(row);
     }
-    mo.data[3][3] = TILES.DESK.id;
-    mo.data[3][8] = TILES.DESK.id;
-    mo.data[5][3] = TILES.DESK.id;
-    mo.data[5][8] = TILES.DESK.id;
+    mo.data[3][3] = TILES.DESK.id; mo.data[3][8] = TILES.DESK.id;
+    mo.data[5][3] = TILES.DESK.id; mo.data[5][8] = TILES.DESK.id;
 
-    // 初期位置設定 (街の中央)
+    // 初期位置
     state.player.x = 20 * CFG.TILE_SIZE;
-    state.player.y = 15 * CFG.TILE_SIZE;
+    state.player.y = 16 * CFG.TILE_SIZE;
 }
 
+// --- Input System (Joystick) ---
 const input = {
     dir: -1, action: false,
     setDir: function(d) { this.dir = d; },
@@ -323,26 +341,74 @@ const input = {
     stopAction: function() { this.action = false; }
 };
 
-// PCキーボード
+// ジョイスティック処理
+const joystick = {
+    zone: document.getElementById('joystick-zone'),
+    knob: document.getElementById('joystick-knob'),
+    active: false,
+    origin: { x: 0, y: 0 },
+    
+    init: function() {
+        this.zone.addEventListener('pointerdown', e => {
+            this.active = true;
+            this.origin = { x: e.clientX, y: e.clientY };
+            this.knob.style.transition = 'none';
+            this.zone.setPointerCapture(e.pointerId);
+        });
+        this.zone.addEventListener('pointermove', e => {
+            if(!this.active) return;
+            const dx = e.clientX - this.origin.x;
+            const dy = e.clientY - this.origin.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            const maxDist = 45; // ノブの移動制限
+            
+            // ノブの表示位置更新
+            const moveX = dist > maxDist ? (dx/dist)*maxDist : dx;
+            const moveY = dist > maxDist ? (dy/dist)*maxDist : dy;
+            this.knob.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
+
+            // 方向判定
+            if(dist > 10) {
+                const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                if(angle >= -45 && angle < 45) input.setDir(1);      // 右
+                else if(angle >= 45 && angle < 135) input.setDir(2); // 下
+                else if(angle >= -135 && angle < -45) input.setDir(0); // 上
+                else input.setDir(3); // 左
+            } else {
+                input.stopDir();
+            }
+        });
+        const stop = (e) => {
+            this.active = false;
+            this.knob.style.transition = '0.2s';
+            this.knob.style.transform = 'translate(-50%, -50%)';
+            input.stopDir();
+        };
+        this.zone.addEventListener('pointerup', stop);
+        this.zone.addEventListener('pointercancel', stop);
+    }
+};
+joystick.init();
+
+// PCキーボードも一応残す
 window.addEventListener('keydown', e => {
-    if(e.key === 'ArrowUp') input.setDir(0);
-    if(e.key === 'ArrowDown') input.setDir(2);
-    if(e.key === 'ArrowLeft') input.setDir(3);
-    if(e.key === 'ArrowRight') input.setDir(1);
-    if(e.key === 'z' || e.key === 'Enter') input.setAction();
+    if(e.key==='ArrowUp') input.setDir(0); if(e.key==='ArrowDown') input.setDir(2);
+    if(e.key==='ArrowLeft') input.setDir(3); if(e.key==='ArrowRight') input.setDir(1);
+    if(e.key==='z' || e.key==='Enter') input.setAction();
 });
 window.addEventListener('keyup', e => {
     if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) input.stopDir();
-    if(e.key === 'z' || e.key === 'Enter') input.stopAction();
+    if(e.key==='z' || e.key==='Enter') input.stopAction();
 });
 
-// ステータス画面切り替え
+// --- Game Logic ---
+
 function toggleStatus() {
     const m = document.getElementById('status-modal');
-    const p = state.player;
     if (m.style.display === 'flex') {
         m.style.display = 'none';
     } else {
+        const p = state.player;
         document.getElementById('st-lv').innerText = p.lv;
         document.getElementById('st-hp-val').innerText = p.hp + '/' + p.maxHp;
         document.getElementById('st-exp').innerText = p.exp;
@@ -351,14 +417,31 @@ function toggleStatus() {
     }
 }
 
-// ゲームループ更新
+function showMsg(text) {
+    const el = document.getElementById('msg-box');
+    el.innerText = text;
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 2000);
+}
+
+function gainExp(amount) {
+    const p = state.player;
+    p.exp += amount;
+    showMsg(`経験値を${amount}得た！`);
+    if(p.exp >= p.nextExp) {
+        p.lv++; p.nextExp = Math.floor(p.nextExp * 1.5);
+        p.maxHp += 10; p.hp = p.maxHp;
+        setTimeout(() => showMsg(`レベルアップ！ Lv${p.lv}になった！`), 1500);
+    }
+}
+
 function update() {
-    // モーダルが開いていたらゲーム停止
     if(document.getElementById('status-modal').style.display === 'flex') return;
 
     const p = state.player;
     const curMap = maps[state.currentMap];
     
+    // 移動処理
     let dx = 0, dy = 0;
     if (input.dir !== -1) {
         p.dir = input.dir;
@@ -375,12 +458,10 @@ function update() {
         const nextX = p.x + dx;
         const nextY = p.y + dy;
         
-        // 当たり判定 (足元のみチェック: 下半分)
-        // タイルサイズ48に対し、足元中心に幅24, 高さ16くらいの判定
-        const ftX = nextX + 12; // 左足
-        const ftR = nextX + 36; // 右足
-        const ftY = nextY + 32; // 足元上
-        const ftB = nextY + 47; // 足元下
+        // 当たり判定 (足元領域のみ)
+        // めり込み防止のため少し狭めに
+        const ftX = nextX + 16; const ftR = nextX + 32;
+        const ftY = nextY + 32; const ftB = nextY + 46;
 
         const check = (x, y) => {
             let tx = Math.floor(x / CFG.TILE_SIZE);
@@ -400,119 +481,111 @@ function update() {
         }
     }
 
-    // カメラ追従
-    state.camera.x = p.x - CFG.SCREEN_W/2 + CFG.TILE_SIZE/2;
-    state.camera.y = p.y - CFG.SCREEN_H/2 + CFG.TILE_SIZE/2;
-    // カメラ範囲制限
-    state.camera.x = Math.max(0, Math.min(state.camera.x, curMap.width * CFG.TILE_SIZE - CFG.SCREEN_W));
-    state.camera.y = Math.max(0, Math.min(state.camera.y, curMap.height * CFG.TILE_SIZE - CFG.SCREEN_H));
-    // 小さいマップ(室内)の場合はセンタリング
+    // カメラ
+    state.camera.x = Math.max(0, Math.min(p.x - CFG.SCREEN_W/2 + 24, curMap.width * CFG.TILE_SIZE - CFG.SCREEN_W));
+    state.camera.y = Math.max(0, Math.min(p.y - CFG.SCREEN_H/2 + 24, curMap.height * CFG.TILE_SIZE - CFG.SCREEN_H));
     if(curMap.width * CFG.TILE_SIZE < CFG.SCREEN_W) state.camera.x = -(CFG.SCREEN_W - curMap.width * CFG.TILE_SIZE)/2;
     if(curMap.height * CFG.TILE_SIZE < CFG.SCREEN_H) state.camera.y = -(CFG.SCREEN_H - curMap.height * CFG.TILE_SIZE)/2;
 
-    // アクション処理
+    // インタラクション (アクションボタン押下時)
     if(input.action) {
-        interact();
+        checkInteraction();
         input.action = false;
     }
+
+    // 出口だけは踏んだら即発動
+    checkExit();
     
-    // UI更新
+    // UI
     document.getElementById('ui-lv').innerText = p.lv;
     document.getElementById('ui-hp').innerText = p.hp;
 }
 
-function showMsg(text) {
-    const el = document.getElementById('msg-box');
-    el.innerHTML = text;
-    el.style.display = 'block';
-    setTimeout(() => el.style.display = 'none', 2000);
-}
-
-function gainExp(amount) {
+// 足元のタイルをチェック (出口用)
+function checkExit() {
     const p = state.player;
-    p.exp += amount;
-    showMsg(`経験値を${amount}得た！`);
+    const cx = p.x + 24; const cy = p.y + 36; // 足元中心
+    const tx = Math.floor(cx / CFG.TILE_SIZE);
+    const ty = Math.floor(cy / CFG.TILE_SIZE);
+    const curMap = maps[state.currentMap];
     
-    if(p.exp >= p.nextExp) {
-        p.lv++;
-        p.nextExp = Math.floor(p.nextExp * 1.5);
-        p.maxHp += 10;
-        p.hp = p.maxHp;
-        setTimeout(() => showMsg(`レベルアップ！ Lv${p.lv}になった！`), 2000);
+    if(curMap.data[ty] && curMap.data[ty][tx] === TILES.EXIT.id) {
+        // 街に戻る (保存した座標へ)
+        changeMap('city', state.savedPos.x, state.savedPos.y, true); 
     }
 }
 
-// 相互作用・イベント
-function interact() {
+// 周囲のタイルをチェック (建物・家具用)
+function checkInteraction() {
     const p = state.player;
     const curMap = maps[state.currentMap];
     
-    // プレイヤー中心座標
-    const cx = p.x + CFG.TILE_SIZE/2;
-    const cy = p.y + CFG.TILE_SIZE/2;
-    let tx = Math.floor(cx / CFG.TILE_SIZE);
-    let ty = Math.floor(cy / CFG.TILE_SIZE);
+    // プレイヤーの中心タイル
+    const tx = Math.floor((p.x + 24) / CFG.TILE_SIZE);
+    const ty = Math.floor((p.y + 24) / CFG.TILE_SIZE);
     
-    // 重なっているタイルを確認
-    let tid = curMap.data[ty][tx];
+    // 調査範囲: 中心 + 上下左右
+    const targets = [
+        {x: tx, y: ty},     // 足元
+        {x: tx, y: ty-1},   // 上
+        {x: tx, y: ty+1},   // 下
+        {x: tx-1, y: ty},   // 左
+        {x: tx+1, y: ty}    // 右
+    ];
 
-    // 出口チェック (乗ったら即移動)
-    if (tid === TILES.EXIT.id) {
-        changeMap('city', state.savedPos.x, state.savedPos.y);
-        return;
-    }
-
-    // 目の前のタイルを確認 (家具や建物に入るアクション)
-    let frontTx = tx, frontTy = ty;
-    if(p.dir===0) frontTy--; if(p.dir===2) frontTy++;
-    if(p.dir===3) frontTx--; if(p.dir===1) frontTx++;
-    
-    if(frontTx>=0 && frontTx<curMap.width && frontTy>=0 && frontTy<curMap.height) {
-        let frontTid = curMap.data[frontTy][frontTx];
-        
-        // 建物に入る
-        if(frontTid === TILES.HOME.id) {
-            state.savedPos = {x: tx, y: ty + 1}; // 出た時の位置
-            changeMap('home', 4, 6);
-            showMsg("ただいま。");
-        }
-        else if(frontTid === TILES.SHOP.id) {
-            state.savedPos = {x: tx, y: ty + 1};
-            changeMap('shop', 5, 6);
-            showMsg("いらっしゃいませー");
-        }
-        else if(frontTid === TILES.OFFICE.id) {
-            state.savedPos = {x: tx, y: ty + 1};
-            changeMap('office', 6, 8);
-            showMsg("出社...");
-        }
-        
-        // 家具イベント
-        else if(frontTid === TILES.BED.id) {
-            p.hp = p.maxHp;
-            showMsg("ベッドで休んだ。<br>HPが全回復した！");
-        }
-        else if(frontTid === TILES.DESK.id) {
-            if(state.currentMap === 'home') {
-                gainExp(10); // 勉強
-            } else {
-                gainExp(20); // 仕事
-                showMsg("仕事をした。<br>経験値を得た。");
+    for(let t of targets) {
+        if(t.y >= 0 && t.y < curMap.height && t.x >= 0 && t.x < curMap.width) {
+            const tid = curMap.data[t.y][t.x];
+            
+            // 建物 (街マップ)
+            if(tid === TILES.HOME.id) {
+                enterBuilding('home', 4, 6);
+                showMsg("ただいま。");
+                return;
+            }
+            if(tid === TILES.SHOP.id) {
+                enterBuilding('shop', 5, 6);
+                showMsg("いらっしゃいませ");
+                return;
+            }
+            if(tid === TILES.OFFICE.id) {
+                enterBuilding('office', 6, 8);
+                showMsg("出社...");
+                return;
+            }
+            
+            // 家具 (室内)
+            if(tid === TILES.BED.id) {
+                p.hp = p.maxHp;
+                showMsg("全回復した！");
+                return;
+            }
+            if(tid === TILES.DESK.id) {
+                if(state.currentMap === 'home') gainExp(10);
+                else { gainExp(20); showMsg("仕事をした"); }
+                return;
             }
         }
     }
 }
 
-function changeMap(mapName, tx, ty) {
+function enterBuilding(mapName, tx, ty) {
+    // 現在の座標を保存 (ピクセル単位で保存して、戻る時に確実にそこに戻す)
+    state.savedPos.x = state.player.x;
+    state.savedPos.y = state.player.y;
+    changeMap(mapName, tx * CFG.TILE_SIZE, ty * CFG.TILE_SIZE, false);
+}
+
+function changeMap(mapName, px, py, isPixel) {
     state.currentMap = mapName;
-    state.player.x = tx * CFG.TILE_SIZE;
-    state.player.y = ty * CFG.TILE_SIZE;
-    state.player.dir = 2; // 下向き
+    state.player.x = px;
+    state.player.y = py;
+    state.player.dir = 2;
+    state.player.moving = false;
 }
 
 // --- Render ---
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+const ctx = document.getElementById('gameCanvas').getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
 function draw() {
@@ -521,6 +594,7 @@ function draw() {
     const curMap = maps[state.currentMap];
     const cam = state.camera;
 
+    // 描画範囲計算
     const startX = Math.floor(cam.x / CFG.TILE_SIZE);
     const endX = startX + (CFG.SCREEN_W / CFG.TILE_SIZE) + 1;
     const startY = Math.floor(cam.y / CFG.TILE_SIZE);
@@ -533,19 +607,27 @@ function draw() {
                 let px = Math.floor(x * CFG.TILE_SIZE - cam.x);
                 let py = Math.floor(y * CFG.TILE_SIZE - cam.y);
                 
-                // 画像があるものは画像、なければ矩形
                 if(tid === TILES.GRASS.id) ctx.drawImage(Sprites.grass, px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
                 else if(tid === TILES.WALL.id) ctx.drawImage(Sprites.wall, px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
+                else if(tid === TILES.SHOP.id) ctx.drawImage(Sprites.shop, px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
+                else if(tid === TILES.OFFICE.id) ctx.drawImage(Sprites.office, px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
                 else if(tid === TILES.HOME.id) ctx.drawImage(Sprites.home, px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
-                else if(tid === TILES.BED.id)  ctx.drawImage(Sprites.bed, px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
+                else if(tid === TILES.BED.id) ctx.drawImage(Sprites.bed, px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
                 else if(tid === TILES.DESK.id) ctx.drawImage(Sprites.desk, px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
                 else {
-                    let c = Object.values(TILES).find(t=>t.id===tid).color;
-                    ctx.fillStyle = c;
-                    ctx.fillRect(px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
-                    // 出口マーカー
+                    let tile = Object.values(TILES).find(t=>t.id===tid);
+                    if(tile.color) {
+                        ctx.fillStyle = tile.color;
+                        ctx.fillRect(px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
+                    } else if (tid === TILES.ROAD.id) {
+                        ctx.fillStyle = '#616161'; ctx.fillRect(px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
+                    } else if (tid === TILES.FLOOR.id) {
+                        ctx.fillStyle = '#d7ccc8'; ctx.fillRect(px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
+                    }
+                    
                     if(tid === TILES.EXIT.id) {
-                        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                        // 出口マーカー
+                        ctx.fillStyle = 'rgba(255,255,255,0.4)';
                         ctx.beginPath(); ctx.moveTo(px+10, py+40); ctx.lineTo(px+24, py+20); ctx.lineTo(px+38, py+40); ctx.fill();
                     }
                 }
@@ -553,16 +635,13 @@ function draw() {
         }
     }
 
-    // プレイヤー描画
+    // Player
     const px = Math.floor(state.player.x - cam.x);
     const py = Math.floor(state.player.y - cam.y);
-    const bob = (state.player.animFrame%2 === 1) ? -2 : 0; // 歩行時の上下動
-
-    // 影
+    const bob = (state.player.animFrame%2 === 1) ? -2 : 0;
+    
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
     ctx.beginPath(); ctx.ellipse(px+24, py+40, 16, 6, 0, 0, Math.PI*2); ctx.fill();
-
-    // キャラ
     ctx.drawImage(Sprites.player_wait, px, py+bob, CFG.TILE_SIZE, CFG.TILE_SIZE);
 }
 
@@ -573,7 +652,6 @@ window.onload = function() {
     generateMaps();
     loop();
 };
-
 </script>
 </body>
 </html>

@@ -1,0 +1,1 @@
+# hoseirpg_serise

@@ -3,1034 +3,457 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>ほうせいRPG 3.7 〜労働とアジト〜</title>
+<title>ほうせいRPG4 〜社畜の伝説〜</title>
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
+
     :root {
-        --bg-color: #202020;
-        --screen-bg: #e0f0e0;
-        --ui-bg: #333;
-        --text-color: #fff;
-        --accent: #4caf50;
-        --danger: #ff5252;
-        --tile-size: 32px;
-        --view-w: 416px; /* 13 * 32 */
-        --view-h: 224px; /* 7 * 32 */
+        --bg-color: #1a1a1a;
+        --game-bg: #000;
+        --ui-border: #fff;
     }
-    
-    * { box-sizing: border-box; touch-action: manipulation; user-select: none; }
-    
+
     body {
         background: var(--bg-color);
-        color: var(--text-color);
-        font-family: 'Courier New', monospace;
         margin: 0;
-        height: 100dvh; 
-        width: 100vw;
+        height: 100vh;
         display: flex;
         justify-content: center;
         align-items: center;
         overflow: hidden;
+        font-family: 'DotGothic16', sans-serif;
+        color: white;
     }
 
-    #scaler {
-        display: flex;
-        justify-content: center;
-        align-items: center;
+    /* ゲーム画面のコンテナ（ブラウン管風エフェクト用） */
+    #game-container {
+        position: relative;
+        width: 640px;
+        height: 480px;
+        background: var(--game-bg);
+        border: 4px solid #444;
+        box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        image-rendering: pixelated; /* ドットをくっきり */
+    }
+
+    canvas {
+        display: block;
         width: 100%;
         height: 100%;
     }
 
-    #game-boy {
-        width: 100%;
-        max-width: 460px;
+    /* UIオーバーレイ（メッセージウィンドウなど） */
+    #ui-layer {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        pointer-events: none;
         display: flex;
         flex-direction: column;
-        background: #444;
-        border: 2px solid #666;
-        border-radius: 10px;
-        padding: 15px;
-        box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        justify-content: flex-end;
     }
 
-    #screen-area {
-        background: var(--screen-bg);
-        border: 4px solid #222;
+    .message-box {
+        background: rgba(0, 0, 0, 0.85);
+        border: 4px solid #fff;
         border-radius: 4px;
-        position: relative;
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-        margin-bottom: 15px;
-        height: 320px; 
-    }
-
-    #status-bar {
-        background: #222;
-        color: #fff;
-        padding: 4px 8px;
-        font-size: 11px;
-        display: flex;
-        justify-content: space-between;
-        z-index: 10;
-        border-bottom: 2px solid #000;
-        height: 24px;
-        flex-shrink: 0;
-    }
-
-    #viewport {
-        position: relative;
-        overflow: hidden;
-        background: #333;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        width: 100%;
-        height: var(--view-h);
-        flex-shrink: 0;
-    }
-
-    #flash-overlay {
-        position: absolute;
-        top: 0; left: 0; right: 0; bottom: 0;
-        pointer-events: none;
-        z-index: 20;
-        opacity: 0;
-        transition: opacity 0.1s;
-    }
-
-    #map-container {
-        position: relative;
-        width: var(--view-w);
-        height: var(--view-h);
-    }
-
-    .tile {
-        position: absolute;
-        width: var(--tile-size);
-        height: var(--tile-size);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        font-size: 20px;
-        line-height: 1;
-    }
-    
-    #player-sprite {
-        position: absolute;
-        width: var(--tile-size);
-        height: var(--tile-size);
-        font-size: 24px;
-        z-index: 10;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        line-height: 1;
-        text-shadow: 0 0 5px white;
-        transition: top 0.1s, left 0.1s;
-    }
-
-    .popup-text {
-        position: absolute;
-        font-weight: bold;
-        font-size: 14px;
-        text-shadow: 1px 1px 0 #000;
-        pointer-events: none;
-        z-index: 100;
-        animation: floatUp 1s forwards;
-        width: 150px;
-        text-align: center;
-        margin-left: -59px;
-    }
-    @keyframes floatUp {
-        0% { transform: translateY(0); opacity: 1; }
-        100% { transform: translateY(-30px); opacity: 0; }
-    }
-
-    #log-window {
-        flex-grow: 1;
-        background: rgba(0,0,0,0.9);
-        color: #fff;
-        font-size: 12px;
-        padding: 5px;
-        overflow-y: auto;
-        border-top: 2px solid #fff;
-        font-family: 'Courier New', sans-serif;
-    }
-    .log-entry { margin-bottom: 2px; border-bottom: 1px solid #333; padding-bottom: 1px; }
-    .log-sys { color: #aaa; }
-    .log-warn { color: #ffeb3b; }
-    .log-bad { color: #ff5252; }
-    .log-good { color: #69f0ae; }
-
-    #controls {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-        padding: 5px;
-        flex-shrink: 0;
-    }
-
-    .d-pad {
-        display: grid;
-        grid-template-columns: 45px 45px 45px;
-        grid-template-rows: 45px 45px 45px;
-        gap: 2px;
-        align-self: center;
-        justify-self: center;
-    }
-    
-    .btn-pad {
-        background: #222;
-        border-radius: 6px;
-        border: 2px solid #111;
-        box-shadow: 0 3px 0 #000;
-        cursor: pointer;
-        color: #555;
-        font-size: 18px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding: 0;
-        -webkit-tap-highlight-color: transparent;
-    }
-    .btn-pad:active { transform: translateY(3px); box-shadow: none; background: #333; }
-    
-    .action-pad {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .menu-btn {
-        width: 100%;
-        max-width: 130px;
-        padding: 12px;
-        background: #555;
-        color: white;
-        border: 2px solid #fff;
-        border-radius: 6px;
-        font-size: 12px;
-        cursor: pointer;
-        box-shadow: 0 3px 0 #222;
-        -webkit-tap-highlight-color: transparent;
-    }
-    .menu-btn:active { transform: translateY(3px); box-shadow: none; }
-
-    .modal {
-        display: none;
-        position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(0,0,0,0.8);
-        z-index: 1000;
-        color: white;
-        flex-direction: column;
-        padding: 20px;
-        overflow-y: auto;
-        justify-content: center;
-        align-items: center;
-        backdrop-filter: blur(2px);
-    }
-    .modal-content {
-        width: 100%;
-        max-width: 500px;
-        background: #333;
-        border: 2px solid #fff;
+        margin: 20px;
         padding: 15px;
-        border-radius: 8px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        min-height: 100px;
+        font-size: 20px;
+        line-height: 1.5;
+        text-shadow: 2px 2px 0 #000;
+        display: none; /* JSで制御 */
     }
-    .modal-header { font-size: 1.2rem; border-bottom: 2px solid var(--accent); margin-bottom: 10px; padding-bottom: 5px; font-weight: bold;}
-    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; font-size: 0.9rem; }
-    .skill-item, .job-item { background: #444; border: 1px solid #666; padding: 10px; margin-bottom: 6px; cursor: pointer; border-radius: 5px; font-size: 0.9rem; position: relative; }
-    .skill-owned { background: #2e7d32; border-color: #4caf50; }
-    .btn-close { margin-top: 10px; padding: 12px; width: 100%; background: var(--danger); border: none; color: white; font-weight: bold; border-radius: 6px; cursor: pointer; }
-    .event-btn { width: 100%; padding: 12px; margin-bottom: 8px; background: #eee; color: #000; border: none; border-radius: 5px; font-size: 1rem; text-align: left; cursor: pointer; border-left: 5px solid #ccc; transition: all 0.1s;}
-    .event-btn:hover { background: #fff; border-left-color: var(--accent); padding-left: 15px; }
-    .event-btn:active { background: #ccc; transform: scale(0.98); }
-    .important-text { color: #ffeb3b; font-weight: bold; background: rgba(255,0,0,0.2); padding: 5px; border-radius: 4px; }
-    
-    .job-badge { background: #2196f3; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-left: 5px; }
+
+    .status-bar {
+        position: absolute;
+        top: 0; left: 0; width: 100%;
+        background: rgba(0,0,0,0.7);
+        padding: 5px 10px;
+        display: flex;
+        gap: 20px;
+        font-size: 16px;
+        border-bottom: 2px solid #fff;
+    }
+
+    /* スマホ用コントローラー */
+    #mobile-controls {
+        position: fixed;
+        bottom: 20px; left: 20px; right: 20px;
+        height: 120px;
+        display: none; /* PCでは非表示 */
+        pointer-events: auto;
+        justify-content: space-between;
+        z-index: 100;
+    }
+    @media (max-width: 800px) {
+        #game-container { width: 100%; height: 60vh; border: none; }
+        #mobile-controls { display: flex; }
+    }
+
+    .dpad {
+        position: relative; width: 120px; height: 120px;
+    }
+    .dbtn {
+        position: absolute; width: 40px; height: 40px;
+        background: rgba(255,255,255,0.2);
+        border: 2px solid rgba(255,255,255,0.5);
+    }
+    .dbtn:active { background: rgba(255,255,255,0.5); }
+    .btn-u { top: 0; left: 40px; }
+    .btn-d { bottom: 0; left: 40px; }
+    .btn-l { top: 40px; left: 0; }
+    .btn-r { top: 40px; right: 0; }
+
+    .action-btn {
+        width: 80px; height: 80px;
+        background: rgba(255,0,0,0.3);
+        border: 2px solid rgba(255,100,100,0.8);
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 20px; color: white; margin-top: 20px;
+    }
+    .action-btn:active { background: rgba(255,0,0,0.6); }
+
 </style>
 </head>
 <body>
 
-<div id="scaler">
-    <div id="game-boy">
-        <div id="screen-area">
-            <div id="status-bar">
-                <span>LV:<span id="ui-lv">1</span></span>
-                <span>HP:<span id="ui-hp">100</span></span>
-                <span>¥:<span id="ui-money">0</span></span>
-                <span><span id="ui-job">ニート</span></span>
-            </div>
-            
-            <div id="viewport">
-                <div id="map-container">
-                    <div id="map-layer"></div>
-                    <div id="player-sprite">😐</div>
-                </div>
-                <div id="flash-overlay"></div>
-            </div>
-            
-            <div id="log-window">
-                <div class="log-entry">アジトと職場が追加されました。</div>
-            </div>
-        </div>
-
-        <div id="controls">
-            <div class="d-pad">
-                <div></div><button class="btn-pad" onclick="game.move(0, -1)">▲</button><div></div>
-                <button class="btn-pad" onclick="game.move(-1, 0)">◀</button>
-                <button class="btn-pad" onclick="game.interact()" style="background:#e91e63; color:white; border-color:#c2185b;">A</button>
-                <button class="btn-pad" onclick="game.move(1, 0)">▶</button>
-                <div></div><button class="btn-pad" onclick="game.move(0, 1)">▼</button><div></div>
-            </div>
-            <div class="action-pad">
-                <button class="menu-btn" onclick="ui.openMenu()">📋 ステータス</button>
-                <button class="menu-btn" onclick="ui.openSkill()">⚡ スキル</button>
-                <button class="menu-btn" style="background:#4caf50; border-color:#388e3c" onclick="game.saveGame()">💾 セーブ</button>
-            </div>
-        </div>
+<div id="game-container">
+    <div class="status-bar">
+        <span>LV: <span id="s-lv">1</span></span>
+        <span>HP: <span id="s-hp">100</span></span>
+        <span>¥: <span id="s-money">1000</span></span>
+        <span>JOB: <span id="s-job">ニート</span></span>
+    </div>
+    <canvas id="gameCanvas" width="320" height="240"></canvas>
+    
+    <div id="ui-layer">
+        <div id="msg-box" class="message-box"></div>
     </div>
 </div>
 
-<div id="modal-menu" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">ステータス</div>
-        <div class="stat-grid">
-            <div>職業: <span id="st-job">ニート</span></div>
-            <div>役職: <span id="st-rank">平社員</span></div>
-            <div>Lv: <span id="st-lv">1</span></div>
-            <div>Exp: <span id="st-xp">0</span> / <span id="st-next">30</span></div>
-            <div>所持金: <span id="st-money">0</span>円</div>
-            <div>ストレス: <span id="st-stress">0</span>%</div>
-            <div>体力: <span id="st-hp">100</span></div>
-            <div>カルマ: <span id="st-karma">0</span></div>
-        </div>
-        <div>所持品: <span id="st-items">なし</span></div>
-        <button class="btn-close" onclick="ui.closeAll()">閉じる</button>
-        <button class="save-btn" onclick="game.loadGame()" style="width:100%; margin-top:10px; padding:10px; background:#ff9800; border:none; border-radius:6px; color:white; cursor:pointer;">ロード</button>
+<div id="mobile-controls">
+    <div class="dpad">
+        <div class="dbtn btn-u" ontouchstart="input.setDir('UP')" ontouchend="input.stopDir()"></div>
+        <div class="dbtn btn-d" ontouchstart="input.setDir('DOWN')" ontouchend="input.stopDir()"></div>
+        <div class="dbtn btn-l" ontouchstart="input.setDir('LEFT')" ontouchend="input.stopDir()"></div>
+        <div class="dbtn btn-r" ontouchstart="input.setDir('RIGHT')" ontouchend="input.stopDir()"></div>
     </div>
-</div>
-
-<div id="modal-skill" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">スキル習得 (SP: <span id="sk-sp">0</span>)</div>
-        <div id="skill-list"></div>
-        <button class="btn-close" onclick="ui.closeAll()">閉じる</button>
-    </div>
-</div>
-
-<div id="modal-event" class="modal">
-    <div class="modal-content">
-        <div class="modal-header" id="ev-title">イベント</div>
-        <div id="ev-body" style="margin-bottom: 15px; font-size: 0.95rem; line-height: 1.4;"></div>
-        <div id="ev-actions"></div>
-        <button class="btn-close" onclick="ui.closeAll()">閉じる</button>
-    </div>
+    <div class="action-btn" ontouchstart="input.setAction()" ontouchend="input.stopAction()">A</div>
 </div>
 
 <script>
-// --- Config ---
+/**
+ * ほうせいRPG4 Core Engine
+ * Canvas APIを使用した本格的RPGエンジン
+ */
+
+// --- Constants ---
 const TILE_SIZE = 32;
-const VIEW_W = 13; 
-const VIEW_H = 7;
-const MAP_W = 40;  
-const MAP_H = 40;  
+const SCREEN_W = 320;
+const SCREEN_H = 240;
+const MAP_W = 40;
+const MAP_H = 40;
 
-const TERRAIN = {
-    GRASS: { id: 0, icon: '', bg: '#8bc34a', walk: true },
-    FOREST: { id: 1, icon: '🌲', bg: '#2e7d32', walk: true, cost: 2 },
-    WATER:  { id: 2, icon: '🌊', bg: '#2196f3', walk: false },
-    MOUNTAIN:{ id: 3, icon: '⛰️', bg: '#795548', walk: true, cost: 3 },
-    CITY:   { id: 4, icon: '', bg: '#bdbdbd', walk: true },
-    WALL:   { id: 5, icon: '🧱', bg: '#555', walk: false },
-    // Spots
-    HOME:   { id: 10, icon: '🏠', bg: '#ffeb3b', type: 'spot', name: '実家' },
-    WORK:   { id: 11, icon: '💼', bg: '#607d8b', type: 'spot', name: 'ハロワ' },
-    SHOP:   { id: 12, icon: '🏪', bg: '#ff9800', type: 'spot', name: 'コンビニ' },
-    SLUM:   { id: 13, icon: '🏚️', bg: '#3e2723', type: 'spot', name: 'スラム' },
-    SHRINE: { id: 14, icon: '⛩️', bg: '#e91e63', type: 'spot', name: '神社' },
-    OFFICE: { id: 15, icon: '🏢', bg: '#90caf9', type: 'spot', name: 'オフィス' },
-    KOBAN:  { id: 16, icon: '👮', bg: '#fff', type: 'spot', name: '交番' },
-    HOUSE:  { id: 17, icon: '🏘️', bg: '#a1887f', type: 'spot', name: '民家' },
-    HIDEOUT:{ id: 18, icon: '🏴', bg: '#424242', type: 'spot', name: 'アジト' } // 追加
+// タイル定義 (色と属性)
+const TILES = {
+    GRASS: { id: 0, color: '#4caf50', walk: true },
+    WATER: { id: 1, color: '#2196f3', walk: false },
+    WALL:  { id: 2, color: '#795548', walk: false }, // 木や壁
+    FLOOR: { id: 3, color: '#9e9e9e', walk: true },  // コンクリ
+    DESK:  { id: 4, color: '#5d4037', walk: false }, // 机
+    
+    // イベント用特殊タイル
+    SHOP:  { id: 10, color: '#ff9800', walk: false },
+    BED:   { id: 11, color: '#e91e63', walk: false },
+    PC:    { id: 12, color: '#607d8b', walk: false }
 };
 
-const JOBS = {
-    neet: { name: "ニート", req: ()=>true, desc: "全ての始まり。" },
-    homeless: { name: "ホームレス", req: ()=>true, desc: "実家を追い出された姿。サバイバル・根性効率UP。" },
-    parttime: { name: "店員", req: (s)=>s.skills.smile>=1, desc: "要:営業スマイルLv1。コンビニで働く。" },
-    yamibaito: { name: "闇バイト", req: ()=>true, desc: "【危険】即採用・高収入・逮捕有" },
-    apology: { name: "謝罪代行", req: (s)=>s.skills.smile>=2 && s.skills.guts>=2, desc: "要:スマイル2/根性2。民家で謝罪する。" },
-    fighter: { name: "戦闘員", req: (s)=>s.skills.guts>=3 && s.lv>=5, desc: "要:根性3/Lv5。アジトで働く。" },
-    scammer: { name: "受け子", req: (s)=>s.skills.criminal>=1 && s.lv>=5, desc: "要:裏の知識/Lv5。アジトで働く。" },
-    regular: { name: "正規社員", req: (s)=>s.skills.society>=3 && s.lv>=10 && s.items.includes('suit'), desc: "要:社会人Lv3/Lv10/スーツ。オフィスで働く。" }
-};
-
-const SKILLS = {
-    survival: { name: "サバイバル", cost: 1, max: 5, desc: "野宿・移動効率UP" },
-    smile: { name: "営業スマイル", cost: 1, max: 3, desc: "接客・謝罪に必須" },
-    typing: { name: "タイピング", cost: 2, max: 5, desc: "事務作業効率UP" },
-    guts: { name: "根性", cost: 3, max: 5, desc: "HP/ストレス耐性UP" },
-    charm: { name: "魅力", cost: 3, max: 5, desc: "交渉・詐欺成功率UP" },
-    society: { name: "社会人としての全て", cost: 4, max: 5, desc: "正規社員に必須。マナー・常識。" },
-    mote: { name: "モテるための全て", cost: 4, max: 5, desc: "結婚に必須。外見とトーク。" },
-    criminal: { name: "裏の知識", cost: 5, max: 1, desc: "スラム街で上級職" }
-};
-
-// --- State ---
-let state = {
-    x: 20, y: 20,
-    lv: 1, xp: 0, nextXp: 30, sp: 0,
-    hp: 100, maxHp: 100,
-    money: 1000,
-    stress: 0,
-    karma: 0,
-    job: 'neet',
-    skills: {},
-    items: [],
-    flags: {
-        married: false,
-        myHome: false,
-        policeGuard: 0,
-        officeRank: 0 // 0:平社員 1:課長 2:部長
+// --- Global State ---
+const state = {
+    player: {
+        x: 5 * TILE_SIZE, // ピクセル単位の座標
+        y: 5 * TILE_SIZE,
+        dir: 2, // 0:上, 1:右, 2:下, 3:左
+        speed: 2, // 移動速度
+        moving: false,
+        lv: 1, hp: 100, maxHp: 100, money: 1000, job: 'ニート'
     },
-    mapData: []
+    camera: { x: 0, y: 0 },
+    map: [],
+    events: []
+};
+
+// --- Graphics Generator (擬似スプライト生成) ---
+// 画像ファイルなしでリッチな見た目にするため、オフスクリーンCanvasに描画
+const assets = {};
+
+function createAsset(key, drawFn) {
+    const c = document.createElement('canvas');
+    c.width = TILE_SIZE;
+    c.height = TILE_SIZE;
+    const ctx = c.getContext('2d');
+    drawFn(ctx);
+    assets[key] = c;
+}
+
+function initAssets() {
+    // プレイヤー (顔)
+    createAsset('player', (ctx) => {
+        ctx.fillStyle = '#ffcc80'; // 肌
+        ctx.fillRect(4, 4, 24, 24);
+        ctx.fillStyle = '#000'; // 目
+        ctx.fillRect(8, 10, 4, 4);
+        ctx.fillRect(20, 10, 4, 4);
+        ctx.fillStyle = '#d32f2f'; // 口
+        ctx.fillRect(10, 20, 12, 2);
+    });
+
+    // 草
+    createAsset('grass', (ctx) => {
+        ctx.fillStyle = '#4caf50';
+        ctx.fillRect(0,0,32,32);
+        ctx.fillStyle = '#81c784'; // 模様
+        ctx.fillRect(4,4,4,4); ctx.fillRect(20,20,6,6);
+    });
+    
+    // 壁（レンガ）
+    createAsset('wall', (ctx) => {
+        ctx.fillStyle = '#795548';
+        ctx.fillRect(0,0,32,32);
+        ctx.strokeStyle = '#5d4037';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(2,2,28,28);
+        ctx.beginPath(); ctx.moveTo(0,16); ctx.lineTo(32,16); ctx.stroke();
+    });
+
+    // 水
+    createAsset('water', (ctx) => {
+        ctx.fillStyle = '#2196f3';
+        ctx.fillRect(0,0,32,32);
+        ctx.fillStyle = '#64b5f6'; // 波
+        ctx.fillRect(5,10,10,2); ctx.fillRect(18,20,10,2);
+    });
+}
+
+// --- Map System ---
+function generateMap() {
+    // シンプルなマップ生成 (周囲を壁、中をランダム)
+    for(let y=0; y<MAP_H; y++) {
+        let row = [];
+        for(let x=0; x<MAP_W; x++) {
+            if(x===0 || x===MAP_W-1 || y===0 || y===MAP_H-1) {
+                row.push(TILES.WALL.id);
+            } else {
+                let r = Math.random();
+                if(r < 0.1) row.push(TILES.WALL.id);
+                else if(r < 0.15) row.push(TILES.WATER.id);
+                else row.push(TILES.GRASS.id);
+            }
+        }
+        state.map.push(row);
+    }
+    // 特定の建物（イベント用）
+    state.map[4][8] = TILES.SHOP.id; // 店
+    state.map[6][6] = TILES.BED.id;  // 家のベッド
+}
+
+function getTileAt(pixelX, pixelY) {
+    const tx = Math.floor(pixelX / TILE_SIZE);
+    const ty = Math.floor(pixelY / TILE_SIZE);
+    if(tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return TILES.WALL;
+    
+    const id = state.map[ty][tx];
+    return Object.values(TILES).find(t => t.id === id) || TILES.GRASS;
+}
+
+// --- Input Handling ---
+const input = {
+    keys: { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, z: false },
+    dir: null,
+    action: false,
+
+    init: function() {
+        window.addEventListener('keydown', e => {
+            if(this.keys.hasOwnProperty(e.key)) this.keys[e.key] = true;
+            if(e.key === 'z' || e.key === 'Enter') this.action = true;
+        });
+        window.addEventListener('keyup', e => {
+            if(this.keys.hasOwnProperty(e.key)) this.keys[e.key] = false;
+            if(e.key === 'z' || e.key === 'Enter') this.action = false;
+        });
+    },
+    
+    // Mobile Touch
+    setDir: function(d) {
+        if(d==='UP') this.keys.ArrowUp = true;
+        if(d==='DOWN') this.keys.ArrowDown = true;
+        if(d==='LEFT') this.keys.ArrowLeft = true;
+        if(d==='RIGHT') this.keys.ArrowRight = true;
+    },
+    stopDir: function() {
+        this.keys.ArrowUp = false; this.keys.ArrowDown = false;
+        this.keys.ArrowLeft = false; this.keys.ArrowRight = false;
+    },
+    setAction: function() { this.action = true; },
+    stopAction: function() { this.action = false; }
 };
 
 // --- Game Logic ---
-const game = {
-    init: function() {
-        this.generateMap();
-        this.renderMap();
-        ui.update();
-        setTimeout(fitScreen, 100);
-    },
+function update() {
+    const p = state.player;
+    let dx = 0;
+    let dy = 0;
 
-    generateMap: function() {
-        state.mapData = [];
-        for(let y=0; y<MAP_H; y++){
-            let row = [];
-            for(let x=0; x<MAP_W; x++){
-                let type = TERRAIN.GRASS.id;
-                let dist = Math.sqrt((x-20)**2 + (y-20)**2);
-                
-                let noise = Math.sin(x/5) + Math.cos(y/5) + Math.random()*0.5;
-                if (noise > 1.5) type = TERRAIN.MOUNTAIN.id;
-                else if (noise > 0.8) type = TERRAIN.FOREST.id;
-                else if (noise < -1.0) type = TERRAIN.WATER.id;
-                
-                if(dist < 10) type = TERRAIN.CITY.id;
-                row.push(type);
-            }
-            state.mapData.push(row);
+    // 移動処理（グリッド単位で動くRPGらしさ）
+    // 今回は「スムーズ移動だが当たり判定はグリッド」にするハイブリッド
+    
+    if (input.keys.ArrowUp) { dy = -p.speed; p.dir = 0; }
+    else if (input.keys.ArrowDown) { dy = p.speed; p.dir = 2; }
+    else if (input.keys.ArrowLeft) { dx = -p.speed; p.dir = 3; }
+    else if (input.keys.ArrowRight) { dx = p.speed; p.dir = 1; }
+
+    if (dx !== 0 || dy !== 0) {
+        // 当たり判定 (移動先の四隅をチェック)
+        const margin = 4; // キャラクターのサイズを少し小さく判定
+        const nextX = p.x + dx;
+        const nextY = p.y + dy;
+        
+        // 簡易的な衝突判定
+        const tl = getTileAt(nextX + margin, nextY + margin); // TopLeft
+        const br = getTileAt(nextX + TILE_SIZE - margin, nextY + TILE_SIZE - margin); // BottomRight
+        
+        if (tl.walk && br.walk) {
+            p.x = nextX;
+            p.y = nextY;
+            p.moving = true;
         }
+    } else {
+        p.moving = false;
+    }
 
-        // 施設配置
-        const set = (x, y, id) => state.mapData[y][x] = id;
-        
-        set(20, 20, TERRAIN.HOME.id);
-        set(20, 19, TERRAIN.WORK.id);
-        set(21, 20, TERRAIN.SHOP.id);
-        set(22, 19, TERRAIN.OFFICE.id); 
-        set(19, 21, TERRAIN.KOBAN.id);  
+    // カメラ更新 (プレイヤー中心)
+    state.camera.x = p.x - SCREEN_W / 2 + TILE_SIZE / 2;
+    state.camera.y = p.y - SCREEN_H / 2 + TILE_SIZE / 2;
 
-        set(10, 30, TERRAIN.SLUM.id);
-        set(8, 32, TERRAIN.HIDEOUT.id); // アジト
-        set(30, 10, TERRAIN.SHRINE.id);
+    // 画面外に行かないようにクランプ
+    state.camera.x = Math.max(0, Math.min(state.camera.x, MAP_W * TILE_SIZE - SCREEN_W));
+    state.camera.y = Math.max(0, Math.min(state.camera.y, MAP_H * TILE_SIZE - SCREEN_H));
 
-        set(18, 18, TERRAIN.HOUSE.id);
-        set(22, 22, TERRAIN.HOUSE.id);
-        set(24, 18, TERRAIN.HOUSE.id);
-        set(16, 22, TERRAIN.HOUSE.id);
-    },
+    // アクション判定 (Zキー)
+    if(input.action) {
+        checkInteraction();
+        input.action = false; // 連打防止
+    }
+}
 
-    getTile: function(x, y) {
-        if(x<0 || x>=MAP_W || y<0 || y>=MAP_H) return TERRAIN.WALL;
-        return Object.values(TERRAIN).find(t => t.id === state.mapData[y][x]) || TERRAIN.GRASS;
-    },
+function checkInteraction() {
+    const p = state.player;
+    // 向いている方向の1マス先を取得
+    let tx = Math.floor((p.x + TILE_SIZE/2) / TILE_SIZE);
+    let ty = Math.floor((p.y + TILE_SIZE/2) / TILE_SIZE);
+    
+    if(p.dir === 0) ty--;
+    if(p.dir === 1) tx++;
+    if(p.dir === 2) ty++;
+    if(p.dir === 3) tx--;
 
-    move: function(dx, dy) {
-        if(ui.isModalOpen) return;
-        let nx = state.x + dx;
-        let ny = state.y + dy;
-        let tile = this.getTile(nx, ny);
-        if(!tile.walk && tile.type !== 'spot') return;
-        
-        let cost = tile.cost || 1;
-        if(state.skills.survival) cost = Math.max(1, cost - state.skills.survival);
-        state.hp -= cost;
-        state.x = nx; state.y = ny;
+    const targetId = state.map[ty][tx];
+    
+    if(targetId === TILES.SHOP.id) showMessage("コンビニだ。\\n夜勤の店員が死んだ目をしている。");
+    else if(targetId === TILES.BED.id) showMessage("万年床だ。\\n寝ればHP回復できる…かもしれない。");
+    else if(targetId === TILES.WALL.id) showMessage("壁だ。乗り越えられない壁だ。");
+    else showMessage(""); // メッセージを消す
+}
 
-        this.gainXp(2);
-        if(state.job === 'homeless' && tile.id === TERRAIN.FOREST.id) this.gainXp(3); 
-
-        this.checkFraudEvent(tile);
-        if(Math.random() < 0.05) this.randomEncounter(tile);
-        
-        if(state.flags.policeGuard > 0) state.flags.policeGuard--;
-
-        this.renderMap();
-        ui.update();
-        this.checkGameOver();
-    },
-
-    interact: function() {
-        if(ui.isModalOpen) return;
-        let tile = this.getTile(state.x, state.y);
-        
-        if(tile.id === TERRAIN.HOME.id) this.eventHome();
-        else if(tile.id === TERRAIN.WORK.id) this.eventHelloWork();
-        else if(tile.id === TERRAIN.SHOP.id) this.eventShop();
-        else if(tile.id === TERRAIN.SLUM.id) this.eventSlum();
-        else if(tile.id === TERRAIN.HIDEOUT.id) this.eventHideout();
-        else if(tile.id === TERRAIN.SHRINE.id) this.eventShrine();
-        else if(tile.id === TERRAIN.OFFICE.id) this.eventOffice();
-        else if(tile.id === TERRAIN.KOBAN.id) this.eventKoban();
-        else if(tile.id === TERRAIN.HOUSE.id) this.eventGenericHouse();
-        else game.log("特に何もない。");
-    },
-
-    gainXp: function(amount) {
-        state.xp += amount;
-        if(state.xp >= state.nextXp) {
-            state.lv++;
-            state.xp -= state.nextXp;
-            state.nextXp = Math.floor(state.nextXp * 1.5);
-            state.sp += 3;
-            state.maxHp += 10;
-            state.hp = state.maxHp;
-            ui.showPopup("LEVEL UP!", "#ffeb3b");
-            game.log(`Lv${state.lv}に上がった！SP+3`, "good");
-        }
-    },
-
-    checkFraudEvent: function(tile) {
-        if(tile.id === TERRAIN.CITY.id && state.money >= 100000 && Math.random() < 0.03) {
-            if(state.flags.policeGuard > 0) {
-                game.log("詐欺師が近寄ってきたが、警官の姿を見て逃げた。", "good");
-            } else if(state.skills.society >= 3) {
-                game.log("詐欺師の口車を見抜いて追い払った！(社会人スキル)", "good");
-            } else {
-                let loss = Math.floor(state.money * 0.3);
-                state.money -= loss;
-                state.stress += 50;
-                ui.showPopup(`-${loss}円`, "#ff5252");
-                ui.flash('red');
-                ui.showEvent("詐欺被害！！", `
-                    <p class="important-text">「オレオレ！事故っちゃって…」</p>
-                    <p>気づいた時には金がなかった。</p>
-                    <p>-${loss}円</p>
-                `);
-            }
-        }
-    },
-
-    eventHome: function() {
-        let houseName = state.flags.myHome ? "マイホーム" : "実家";
-        if(state.job === 'homeless' && !state.flags.myHome) {
-            ui.showEvent("実家", "<p>鍵が変えられている…</p>");
+// --- UI System ---
+const ui = {
+    msgBox: document.getElementById('msg-box'),
+    showMsg: function(text) {
+        if(!text) {
+            this.msgBox.style.display = 'none';
             return;
         }
-        let html = `<p>${houseName}。安らぎの場所。</p>
-        <button class="event-btn" onclick="ui.doAction('sleep')">🛌 寝る (全回復)</button>
-        <button class="event-btn" onclick="ui.doAction('study')">📚 資格勉強 (XP+10)</button>`;
-        
-        if(state.flags.married) html += `<button class="event-btn" onclick="ui.doAction('love')">💕 愛を育む (ストレス超回復)</button>`;
-        else html += `<button class="event-btn" onclick="ui.doAction('pc')">💻 ネット (ストレス-40)</button>`;
-        ui.showEvent(houseName, html);
-    },
-
-    eventGenericHouse: function() {
-        let html = "<p>普通の民家だ。</p>";
-        if(state.job === 'apology') html += `<button class="event-btn" onclick="ui.doAction('work_apology')">🙇 謝罪代行する</button>`;
-        if(state.job === 'yamibaito' || state.job === 'fighter') html += `<button class="event-btn" onclick="ui.doAction('work_crime')">🔨 押し込み強盗する</button>`;
-        if(state.job === 'parttime') html += `<button class="event-btn" onclick="ui.doAction('work_sales')">📦 置き配バイト</button>`;
-        ui.showEvent("民家", html);
-    },
-
-    eventKoban: function() {
-        ui.showEvent("交番", `
-            <p>街の安全を守る。</p>
-            <button class="event-btn" onclick="ui.doAction('koban_consult')">👮 防犯登録 (無料)</button>
-            <button class="event-btn" onclick="ui.doAction('koban_lost')">😭 落とし物届</button>
-        `);
-    },
-
-    eventOffice: function() {
-        let rankName = ["平社員", "課長", "部長"][state.flags.officeRank || 0];
-        let html = `<p>高層オフィスビル。<br>現在の役職: <b>${rankName}</b></p>`;
-        
-        if(state.job === 'regular') {
-            html += `<button class="event-btn" onclick="ui.doAction('work_office')">💼 出社して働く (安定収入)</button>`;
-            
-            // 昇進判定
-            if(state.flags.officeRank === 0 && state.lv >= 20 && state.skills.society >= 4) {
-                 html += `<button class="event-btn" style="border-color:gold" onclick="ui.doAction('promote')">🌟 課長昇進試験を受ける</button>`;
-            } else if(state.flags.officeRank === 1 && state.lv >= 35 && state.skills.guts >= 4) {
-                 html += `<button class="event-btn" style="border-color:gold" onclick="ui.doAction('promote')">👑 部長昇進試験を受ける</button>`;
-            }
-        } else {
-            html += `<p class="log-sys">※正規社員のみ入館可能</p>`;
-        }
-        
-        if(!state.flags.myHome) html += `<button class="event-btn" onclick="ui.doAction('buy_house')">🏠 マイホーム購入 (100万円)</button>`;
-        ui.showEvent("オフィス", html);
-    },
-
-    eventShop: function() {
-        let html = `<p>24時間営業。</p>`;
-        
-        // 店員（parttime）の仕事
-        if(state.job === 'parttime') {
-            html += `<button class="event-btn" style="background:#e3f2fd; border-color:#2196f3" onclick="ui.doAction('work_shop')">🏪 レジ打ちバイト (+3000円)</button><hr>`;
-        }
-
-        html += `<button class="event-btn" onclick="ui.doAction('buy', 'food')">🍱 弁当 (300円)</button>
-            <button class="event-btn" onclick="ui.doAction('buy', 'drink')">🍺 酒 (200円)</button>`;
-        if(!state.items.includes('suit')) html += `<button class="event-btn" onclick="ui.doAction('buy', 'suit')">👔 スーツを買う (5万円)</button>`;
-        ui.showEvent("コンビニ", html);
-    },
-
-    eventHideout: function() {
-        let html = "<p>薄暗い部屋に強面な男たちがいる。</p>";
-        
-        if(state.job === 'fighter') {
-            html += `<p>「おぅ、仕事の時間だぞ」</p>
-            <button class="event-btn" style="background:#ffebee; border-color:#d32f2f" onclick="ui.doAction('work_fight')">👊 対立組織へカチコミ (+2万円/危険)</button>`;
-        } else if (state.job === 'scammer') {
-            html += `<p>「名簿はここにある」</p>
-            <button class="event-btn" style="background:#fff3e0; border-color:#ff9800" onclick="ui.doAction('work_scam')">📞 現金回収の電話 (+5万円〜/高リスク)</button>`;
-        } else {
-            html += `<p>「関係ねえ奴は消えな！」<br>睨まれただけで逃げ出した。</p>`;
-        }
-        ui.showEvent("アジト", html);
-    },
-
-    eventHelloWork: function() {
-        let html = "<p>職業斡旋所。</p>";
-        for(let key in JOBS) {
-            if(['yamibaito','fighter','scammer','apology'].includes(key)) continue; 
-            let j = JOBS[key];
-            let color = state.job === key ? "#4caf50" : "";
-            html += `<div class="job-item" style="border-color:${color}" onclick="ui.doAction('change_job', '${key}')">
-                <b>${j.name}</b><br><small>${j.desc}</small>
-            </div>`;
-        }
-        ui.showEvent("ハローワーク", html);
-    },
-
-    eventSlum: function() {
-        let html = "<p>危険な匂いがするエリア。</p>";
-        const darkJobs = ['yamibaito', 'apology', 'scammer', 'fighter'];
-        darkJobs.forEach(key => {
-            let j = JOBS[key];
-            html += `<div class="job-item" style="border-color:#ff5252" onclick="ui.doAction('change_job', '${key}')">
-                <b>${j.name}</b><br><small>${j.desc}</small>
-            </div>`;
-        });
-        ui.showEvent("スラム街", html);
-    },
-    
-    eventShrine: function() {
-        let html = `<p>神聖な場所。</p>
-            <button class="event-btn" onclick="ui.doAction('pray', 100)">🙏 祈る (-100円/カルマ浄化)</button>
-            <button class="event-btn" onclick="ui.doAction('pray', -100)">💰 賽銭泥棒 (危険)</button>`;
-        if(!state.flags.married) html += `<hr><button class="event-btn" onclick="ui.doAction('marry_check')">💍 プロポーズする (要:30万円/正規社員)</button>`;
-        ui.showEvent("神社", html);
-    },
-
-    checkGameOver: function() {
-        if(state.hp <= 0) {
-            ui.flash('red');
-            alert("過労で倒れました…病院送りです。");
-            state.hp = state.maxHp;
-            state.money = Math.floor(state.money / 2);
-            state.x = 20; state.y = 20;
-            state.job = 'neet';
-            game.renderMap();
-        }
-        if(state.stress >= 100) {
-            ui.flash('red');
-            game.log("ストレス限界！発狂して散財！", "bad");
-            state.money = Math.max(0, state.money - 50000);
-            state.stress = 0;
-            if(state.flags.married) {
-                game.log("配偶者に愛想を尽かされ離婚した…", "bad");
-                state.flags.married = false;
-            }
-        }
-    },
-
-    randomEncounter: function(tile) {
-        if(tile.id === TERRAIN.CITY.id) { 
-             game.log("街の騒音で頭が痛い。", "sys"); state.stress+=2;
-        }
-    },
-    
-    saveGame: function() {
-        localStorage.setItem('houseiRPG37_save', JSON.stringify(state));
-        alert("セーブ完了");
-    },
-    
-    loadGame: function() {
-        let d = localStorage.getItem('houseiRPG37_save');
-        if(d) { state = JSON.parse(d); game.generateMap(); game.renderMap(); ui.update(); ui.closeAll(); alert("ロード完了"); }
-    },
-
-    log: function(msg, type='') {
-        const win = document.getElementById('log-window');
-        const div = document.createElement('div');
-        div.className = "log-entry " + (type ? 'log-'+type : '');
-        div.innerText = msg;
-        win.appendChild(div);
-        win.scrollTop = win.scrollHeight;
-    },
-
-    renderMap: function() {
-        const layer = document.getElementById('map-layer');
-        layer.innerHTML = '';
-        
-        let startX = state.x - Math.floor(VIEW_W/2);
-        let startY = state.y - Math.floor(VIEW_H/2);
-
-        for(let y=0; y<VIEW_H; y++) {
-            for(let x=0; x<VIEW_W; x++) {
-                let mapX = startX + x;
-                let mapY = startY + y;
-                let tile = this.getTile(mapX, mapY);
-                let div = document.createElement('div');
-                div.className = 'tile';
-                div.style.left = (x * TILE_SIZE) + 'px';
-                div.style.top = (y * TILE_SIZE) + 'px';
-                div.innerText = tile.icon;
-                div.style.backgroundColor = tile.bg;
-                layer.appendChild(div);
-            }
-        }
-        
-        let face = "😐";
-        if(state.job === 'host') face = "😎";
-        if(['yamibaito','scammer','fighter'].includes(state.job)) face = "🕶️";
-        if(state.job === 'apology') face = "🙇";
-        if(state.job === 'regular') face = "👔";
-        if(state.stress > 80) face = "😱";
-        if(state.hp < 20) face = "🤢";
-        if(state.flags.married && state.stress < 20) face = "🥰";
-
-        const sprite = document.getElementById('player-sprite');
-        sprite.innerText = face;
-        sprite.style.left = (Math.floor(VIEW_W/2) * TILE_SIZE) + 'px';
-        sprite.style.top = (Math.floor(VIEW_H/2) * TILE_SIZE) + 'px';
+        this.msgBox.style.display = 'block';
+        this.msgBox.innerHTML = text.replace(/\\n/g, '<br>');
     }
 };
 
-const ui = {
-    isModalOpen: false,
-
-    update: function() {
-        document.getElementById('ui-lv').innerText = state.lv;
-        document.getElementById('ui-hp').innerText = state.hp;
-        document.getElementById('ui-money').innerText = state.money;
-        document.getElementById('ui-job').innerText = JOBS[state.job].name;
-    },
-
-    showPopup: function(text, color="#fff") {
-        const container = document.getElementById('player-sprite');
-        const el = document.createElement('div');
-        el.className = 'popup-text';
-        el.innerText = text;
-        el.style.color = color;
-        document.getElementById('viewport').appendChild(el);
-        
-        const sprite = document.getElementById('player-sprite');
-        el.style.left = sprite.style.left;
-        el.style.top = sprite.style.top;
-
-        setTimeout(() => el.remove(), 1000);
-    },
-
-    flash: function(color) {
-        const ov = document.getElementById('flash-overlay');
-        ov.style.backgroundColor = color;
-        ov.style.opacity = 0.5;
-        setTimeout(() => ov.style.opacity = 0, 100);
-    },
-
-    openMenu: function() {
-        this.isModalOpen = true;
-        document.getElementById('modal-menu').style.display = 'flex';
-        let rankName = ["平社員", "課長", "部長"][state.flags.officeRank || 0];
-        
-        document.getElementById('st-job').innerText = JOBS[state.job].name;
-        document.getElementById('st-rank').innerText = state.job === 'regular' ? rankName : "-";
-        document.getElementById('st-partner').innerText = state.flags.married ? "あり(ラブラブ)" : "なし";
-        document.getElementById('st-lv').innerText = state.lv;
-        document.getElementById('st-xp').innerText = state.xp;
-        document.getElementById('st-next').innerText = state.nextXp;
-        document.getElementById('st-money').innerText = state.money;
-        document.getElementById('st-stress').innerText = state.stress;
-        document.getElementById('st-hp').innerText = state.hp + "/" + state.maxHp;
-        document.getElementById('st-sp').innerText = state.sp;
-        document.getElementById('st-karma').innerText = state.karma;
-        
-        let items = state.items.map(i => i === 'suit' ? 'スーツ' : i).join(', ');
-        document.getElementById('st-items').innerText = items || "なし";
-    },
-
-    openSkill: function() {
-        this.isModalOpen = true;
-        document.getElementById('modal-skill').style.display = 'flex';
-        document.getElementById('sk-sp').innerText = state.sp;
-        const list = document.getElementById('skill-list');
-        list.innerHTML = "";
-        for(let key in SKILLS) {
-            let s = SKILLS[key];
-            let currentLv = state.skills[key] || 0;
-            let cls = currentLv > 0 ? "skill-item skill-owned" : "skill-item";
-            list.innerHTML += `<div class="${cls}" onclick="ui.learnSkill('${key}')">
-                <b>${s.name}</b> (Lv.${currentLv}/${s.max}) SP:${s.cost}<br>
-                <small>${s.desc}</small>
-            </div>`;
-        }
-    },
-
-    learnSkill: function(key) {
-        let s = SKILLS[key];
-        let currentLv = state.skills[key] || 0;
-        if(currentLv >= s.max) return alert("最大レベルです");
-        if(state.sp < s.cost) return alert("SPが足りません");
-        if(confirm(`${s.name} を習得しますか？`)) {
-            state.sp -= s.cost;
-            state.skills[key] = currentLv + 1;
-            ui.showPopup("SKILL UP!", "#69f0ae");
-            game.log(`${s.name} Lv${currentLv+1} 習得！`, "good");
-            this.openSkill();
-        }
-    },
-
-    showEvent: function(title, html) {
-        this.isModalOpen = true;
-        document.getElementById('modal-event').style.display = 'flex';
-        document.getElementById('ev-title').innerText = title;
-        document.getElementById('ev-body').innerHTML = html;
-        document.getElementById('ev-actions').innerHTML = "";
-    },
-
-    closeAll: function() {
-        this.isModalOpen = false;
-        document.querySelectorAll('.modal').forEach(e => e.style.display = 'none');
-    },
-
-    doAction: function(act, param) {
-        let success = true;
-        
-        // --- 生活 ---
-        if(act === 'sleep') { 
-            state.hp = state.maxHp; state.stress = Math.max(0, state.stress - 20); 
-            ui.flash('white'); ui.showPopup("HP全快", "#69f0ae"); game.log("ぐっすり寝た。"); 
-        }
-        else if(act === 'study') { 
-            state.xp += 10; state.stress += 5; game.gainXp(0); 
-            ui.showPopup("XP+10", "#fff"); game.log("勉強した(XP+10)"); 
-        }
-        else if(act === 'pc') { 
-            state.stress = Math.max(0, state.stress - 40); 
-            ui.showPopup("ストレス↓", "#2196f3"); game.log("ネットサーフィンした。"); 
-        }
-        else if(act === 'love') { 
-            state.stress = 0; ui.flash('pink'); ui.showPopup("LOVE!!", "#e91e63"); 
-            game.log("幸せな時間を過ごした。", "good"); 
-        }
-        
-        // --- 買い物 ---
-        else if(act === 'buy') {
-            if(param === 'food' && state.money >= 300) { 
-                state.money -= 300; state.hp += 50; 
-                ui.showPopup("HP+50", "#69f0ae"); game.log("弁当を食べた。"); 
-            }
-            else if(param === 'drink' && state.money >= 200) { 
-                state.money -= 200; state.stress -= 30; 
-                ui.showPopup("ストレス↓", "#2196f3"); game.log("酒を飲んだ。"); 
-            }
-            else if(param === 'suit') {
-                if(state.money < 50000) return alert("金が足りない！");
-                state.money -= 50000;
-                state.items.push('suit');
-                ui.showPopup("-5万円", "#ff5252");
-                game.log("スーツを購入した！就職活動ができる！", "good");
-            }
-        }
-        
-        // --- 転職 ---
-        else if(act === 'change_job') {
-            let j = JOBS[param];
-            if(!j.req(state)) { alert("条件を満たしていません\n" + j.desc); success = false; }
-            else { 
-                state.job = param; 
-                ui.flash('white');
-                game.log(`${j.name}に転職した！`, "good"); 
-            }
-        }
-
-        // --- 仕事（New!） ---
-        
-        // 店員（コンビニ）
-        else if(act === 'work_shop') {
-            state.money += 3000; state.hp -= 15; state.stress += 10; game.gainXp(10);
-            ui.showPopup("+3000円", "#ffeb3b");
-            game.log("「温めますか？」機械的な接客をした。", "good");
-        }
-
-        // 正規社員（オフィス）
-        else if(act === 'work_office') {
-            let rankBonus = (state.flags.officeRank || 0) * 10000;
-            let earn = 15000 + rankBonus + (state.skills.society * 2000) + (state.skills.typing * 1000);
-            state.money += earn; state.hp -= 30; state.stress += 25; game.gainXp(25);
-            ui.showPopup(`+${earn}円`, "#ffeb3b");
-            game.log(`定時まで働いた。(役職手当:+${rankBonus})`, "good");
-        }
-        
-        // 昇進（オフィス）
-        else if(act === 'promote') {
-            state.flags.officeRank = (state.flags.officeRank || 0) + 1;
-            ui.flash('gold');
-            ui.showPopup("昇進！！", "#ffeb3b");
-            game.log("昇進試験に合格した！給料アップ！", "good");
-        }
-
-        // 戦闘員（アジト）
-        else if(act === 'work_fight') {
-            if(Math.random() < 0.1) {
-                state.hp = 1; state.money = Math.floor(state.money * 0.8);
-                ui.flash('red'); ui.showPopup("返り討ち", "#d32f2f");
-                game.log("敵対組織に囲まれボコボコにされた…", "bad");
-            } else {
-                let earn = 20000 + (Math.random()*10000);
-                state.money += Math.floor(earn); state.hp -= 40; state.karma -= 20; game.gainXp(50);
-                ui.showPopup(`+${Math.floor(earn)}円`, "#ffeb3b");
-                game.log("抗争に勝利した！", "good");
-            }
-        }
-
-        // 受け子（アジト）
-        else if(act === 'work_scam') {
-             if(Math.random() < 0.2) {
-                state.money = 0; state.job = 'neet'; state.stress=100;
-                ui.flash('blue');
-                game.log("警察だ！逮捕！全てを没収された！", "bad");
-            } else {
-                let earn = 50000 + (state.skills.charm * 10000);
-                state.money += Math.floor(earn); state.karma -= 50; state.stress += 40; game.gainXp(40);
-                ui.showPopup(`+${Math.floor(earn)}円`, "#ffeb3b");
-                game.log("老人を騙して金を回収した…良心が痛む。", "warn");
-            }
-        }
-        
-        // --- 既存の仕事 ---
-        else if(act === 'work_apology') { 
-            let earn = 8000 + (state.skills.smile * 2000);
-            state.money += earn; state.hp -= 20; state.stress += 40; game.gainXp(15);
-            ui.flash('purple'); ui.showPopup(`+${earn}円`, "#ffeb3b");
-            game.log(`土下座して${earn}円得た。`, "warn");
-        }
-        else if(act === 'work_crime') { 
-            if(Math.random() < 0.3) {
-                state.money = 0; state.job = 'neet'; state.stress=100;
-                ui.flash('red'); game.log("警察だ！逮捕！", "bad");
-            } else {
-                let earn = 50000 + (Math.random()*50000);
-                state.money += Math.floor(earn); state.karma -= 50; state.stress += 50;
-                ui.showPopup(`+${Math.floor(earn)}円`, "#ffeb3b");
-                game.log(`押し入って${Math.floor(earn)}円奪った！`, "bad");
-            }
-        }
-        else if(act === 'work_sales') {
-            state.money += 2000; state.hp -= 10; game.gainXp(5);
-            ui.showPopup("+2000円", "#ffeb3b");
-            game.log("荷物を置いた。+2000円");
-        }
-
-        // --- 交番 ---
-        else if(act === 'koban_consult') {
-            state.flags.policeGuard = 100;
-            ui.showPopup("防犯登録完了", "#2196f3");
-            game.log("パトロール強化！", "good");
-        }
-        else if(act === 'koban_lost') {
-            if(Math.random() < 0.2) {
-                let found = 1000 + Math.floor(Math.random()*5000);
-                state.money += found;
-                ui.showPopup(`+${found}円`, "#ffeb3b");
-                game.log(`謝礼${found}円をもらった！`, "good");
-            } else {
-                game.log("届いていなかった。");
-            }
-        }
-
-        // --- その他 ---
-        else if(act === 'pray') {
-            if(param > 0 && state.money>=100) { 
-                state.money-=100; state.karma = Math.max(0, state.karma+10); 
-                ui.flash('white'); game.log("心が洗われた。"); 
-            }
-            else if(param < 0) { 
-                state.money+=500; state.karma-=30; 
-                ui.flash('red'); ui.showPopup("バチ当たり", "#ff5252");
-                game.log("賽銭を盗んだ…", "bad"); 
-            }
-        }
-        else if(act === 'buy_house') {
-            if(state.money < 1000000) return alert("100万円必要です。");
-            if(confirm("100万円でマイホームを買いますか？")) {
-                state.money -= 1000000;
-                state.flags.myHome = true;
-                ui.flash('gold');
-                game.log("マイホームを手に入れた！！！", "good");
-            }
-        }
-        else if(act === 'marry_check') {
-            if(state.job !== 'regular') return alert("「正規社員じゃないと無理」");
-            if(state.lv < 15) return alert("「Lv15以上は欲しいわ」");
-            if((state.skills.mote || 0) < 3) return alert("「話がつまらないわ（モテLv3）」");
-            if(state.money < 300000) return alert("資金（30万円）不足！");
-            
-            if(confirm("30万円支払って結婚しますか？")) {
-                state.money -= 300000;
-                state.flags.married = true;
-                ui.flash('pink');
-                game.log("結婚しました！", "good");
-            }
-        }
-
-        if(success) this.closeAll();
-        ui.update();
-        game.checkGameOver();
-    }
-};
-
-function fitScreen() {
-    const gameBoy = document.getElementById('game-boy');
-    const wrapper = document.getElementById('scaler');
-    gameBoy.style.transform = 'none';
-    const scale = Math.min(wrapper.clientHeight / (gameBoy.offsetHeight + 20), wrapper.clientWidth / (gameBoy.offsetWidth + 20));
-    gameBoy.style.transform = `scale(${Math.min(scale, 1)})`;
+function showMessage(text) {
+    ui.showMsg(text);
 }
-window.addEventListener('load', fitScreen);
-window.addEventListener('resize', fitScreen);
 
-window.addEventListener('keydown', (e) => {
-    if(e.key === 'ArrowUp') game.move(0, -1);
-    if(e.key === 'ArrowDown') game.move(0, 1);
-    if(e.key === 'ArrowLeft') game.move(-1, 0);
-    if(e.key === 'ArrowRight') game.move(1, 0);
-    if(e.key === 'z' || e.key === 'Enter') game.interact();
-});
+// --- Renderer ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+// ドット絵をくっきりさせる
+ctx.imageSmoothingEnabled = false; 
 
-game.init();
+function draw() {
+    // 画面クリア
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
+
+    // タイル描画範囲の計算
+    const startCol = Math.floor(state.camera.x / TILE_SIZE);
+    const endCol = startCol + (SCREEN_W / TILE_SIZE) + 1;
+    const startRow = Math.floor(state.camera.y / TILE_SIZE);
+    const endRow = startRow + (SCREEN_H / TILE_SIZE) + 1;
+    
+    const offsetX = -state.camera.x + startCol * TILE_SIZE;
+    const offsetY = -state.camera.y + startRow * TILE_SIZE;
+
+    for (let c = startCol; c <= endCol; c++) {
+        for (let r = startRow; r <= endRow; r++) {
+            if (c >= 0 && c < MAP_W && r >= 0 && r < MAP_H) {
+                let tileId = state.map[r][c];
+                let tile = Object.values(TILES).find(t => t.id === tileId);
+                let x = (c - startCol) * TILE_SIZE + offsetX;
+                let y = (r - startRow) * TILE_SIZE + offsetY;
+                
+                // アセットがあれば画像、なければ単色
+                if(tileId === TILES.GRASS.id) ctx.drawImage(assets.grass, x, y);
+                else if(tileId === TILES.WALL.id) ctx.drawImage(assets.wall, x, y);
+                else if(tileId === TILES.WATER.id) ctx.drawImage(assets.water, x, y);
+                else {
+                    ctx.fillStyle = tile ? tile.color : '#000';
+                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                }
+            }
+        }
+    }
+
+    // プレイヤー描画
+    const px = state.player.x - state.camera.x;
+    const py = state.player.y - state.camera.y;
+    ctx.drawImage(assets.player, px, py);
+    
+    // デバッグ用: 向き表示
+    /*
+    ctx.fillStyle = 'red';
+    if(state.player.dir===0) ctx.fillRect(px+14, py, 4, 4);
+    if(state.player.dir===1) ctx.fillRect(px+28, py+14, 4, 4);
+    if(state.player.dir===2) ctx.fillRect(px+14, py+28, 4, 4);
+    if(state.player.dir===3) ctx.fillRect(px, py+14, 4, 4);
+    */
+}
+
+// --- Main Loop ---
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+// --- Init ---
+window.onload = function() {
+    initAssets();
+    generateMap();
+    input.init();
+    gameLoop();
+};
+
 </script>
 </body>
 </html>

@@ -3,487 +3,489 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>ほうせいRPG4 Tablet Edition</title>
+<title>ほうせいRPG4 Part2 Fixed</title>
 <style>
     @import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
 
-    :root {
-        --bg-color: #202020;
-    }
-
+    :root { --bg-color: #121212; --accent: #ffd700; }
     body {
-        background: var(--bg-color);
-        margin: 0;
-        height: 100vh;
-        width: 100vw;
-        overflow: hidden;
-        font-family: 'DotGothic16', sans-serif;
-        color: white;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        touch-action: none; /* ダブルタップ拡大などを防止 */
+        background: var(--bg-color); margin: 0; height: 100vh; width: 100vw;
+        overflow: hidden; font-family: 'DotGothic16', sans-serif; color: white;
+        touch-action: none; user-select: none; -webkit-user-select: none;
+        display: flex; justify-content: center; align-items: center;
     }
 
     #game-wrapper {
-        position: relative;
-        width: 100%;
-        height: 100%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        background: #000;
+        position: relative; width: 100%; height: 100%; background: #000;
+        display: flex; justify-content: center; align-items: center;
     }
-
     canvas {
-        display: block;
-        image-rendering: pixelated; /* ドットをくっきり表示 */
-        box-shadow: 0 0 50px rgba(0,0,0,0.5);
-        max-width: 100%;
-        max-height: 100%;
+        display: block; image-rendering: pixelated;
+        width: 100%; height: 100%; object-fit: contain;
     }
 
-    /* UIオーバーレイ */
-    #ui-layer {
-        position: absolute;
-        top: 0; left: 0; width: 100%; height: 100%;
+    /* UIレイヤー */
+    #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+    
+    .status-bar {
+        position: absolute; top: 10px; left: 10px;
+        background: rgba(0,0,0,0.8); border: 2px solid #fff; border-radius: 8px;
+        padding: 5px 15px; display: flex; gap: 15px; font-size: 18px; pointer-events: auto;
+    }
+    .location-name {
+        position: absolute; top: 50px; left: 15px; font-size: 20px; color: #ffeb3b;
+        text-shadow: 2px 2px 0 #000;
+    }
+
+    /* メニューボタン */
+    #menu-btn {
+        position: absolute; top: 10px; right: 10px;
+        width: 50px; height: 50px; background: #444; border: 2px solid #fff;
+        border-radius: 8px; font-size: 24px; display: flex;
+        justify-content: center; align-items: center; cursor: pointer; pointer-events: auto;
+        z-index: 50;
+    }
+    #menu-btn:active { background: #666; }
+
+    /* メニュー画面 (オーバーレイ) */
+    #menu-screen {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.95); z-index: 100; display: none;
+        flex-direction: column; align-items: center; padding-top: 50px; pointer-events: auto;
+    }
+    .menu-title { font-size: 32px; color: var(--accent); margin-bottom: 20px; border-bottom: 2px solid var(--accent); }
+    .menu-list { width: 80%; display: flex; flex-direction: column; gap: 15px; }
+    .menu-item {
+        background: #333; padding: 15px; border: 1px solid #fff; font-size: 20px; cursor: pointer;
+    }
+    .menu-item:active { background: var(--accent); color: #000; }
+    #menu-msg { margin-top: 20px; color: #ccc; white-space: pre-wrap; line-height: 1.5; padding: 20px; }
+
+    /* ガチャ結果 */
+    #gacha-result {
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        width: 300px; height: 350px; background: #fff; color: #000;
+        border: 8px double #000; display: none; flex-direction: column;
+        align-items: center; justify-content: center; z-index: 200;
+        animation: popIn 0.3s ease-out; pointer-events: auto;
+    }
+    @keyframes popIn { from { transform: translate(-50%, -50%) scale(0); } to { transform: translate(-50%, -50%) scale(1); } }
+    .rarity { font-size: 40px; font-weight: bold; margin-bottom: 10px; }
+    .item-name { font-size: 22px; text-align: center; margin-bottom: 20px; padding: 0 10px; }
+
+    /* --- 固定ジョイスティック --- */
+    #stick-container {
+        position: absolute; bottom: 30px; left: 30px;
+        width: 140px; height: 140px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        pointer-events: auto; /* ここだけタッチ有効 */
+        touch-action: none;
+    }
+    #stick-knob {
+        position: absolute; top: 50%; left: 50%;
+        width: 50px; height: 50px;
+        background: rgba(255, 215, 0, 0.6);
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
         pointer-events: none;
     }
 
-    .status-bar {
-        position: absolute;
-        top: 10px; left: 10px;
-        background: rgba(0, 0, 0, 0.8);
-        border: 2px solid #fff;
-        border-radius: 8px;
-        padding: 8px 16px;
-        font-size: 20px;
-        text-shadow: 2px 2px 0 #000;
-        display: flex;
-        gap: 20px;
-    }
-
-    .msg-box {
-        position: absolute;
-        bottom: 20px; left: 50%;
-        transform: translateX(-50%);
-        width: 80%;
-        background: rgba(0, 0, 0, 0.9);
-        border: 4px solid #fff;
-        border-radius: 8px;
-        padding: 20px;
-        font-size: 24px;
-        line-height: 1.5;
-        display: none;
-    }
-
-    /* タブレット・スマホ用コントローラー */
-    #touch-controls {
-        position: absolute;
-        bottom: 20px; left: 20px; right: 20px;
-        height: 180px;
-        pointer-events: auto;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        opacity: 0.6;
-        transition: opacity 0.3s;
-    }
-    #touch-controls:active { opacity: 1; }
-
-    .dpad-area {
-        position: relative;
-        width: 180px; height: 180px;
-        background: rgba(255,255,255,0.1);
-        border-radius: 50%;
-        border: 2px solid rgba(255,255,255,0.3);
-    }
-    
-    .dbtn {
-        position: absolute; width: 60px; height: 60px;
-        cursor: pointer;
-    }
-    /* 十字キーの配置 */
-    .btn-u { top: 0; left: 60px; }
-    .btn-d { bottom: 0; left: 60px; }
-    .btn-l { top: 60px; left: 0; }
-    .btn-r { top: 60px; right: 0; }
-
-    .action-btn {
-        width: 100px; height: 100px;
-        background: rgba(255, 50, 50, 0.3);
-        border: 4px solid rgba(255, 100, 100, 0.8);
-        border-radius: 50%;
+    /* アクションボタン（右下） */
+    #action-btn {
+        position: absolute; bottom: 40px; right: 40px;
+        width: 90px; height: 90px; background: rgba(255, 50, 50, 0.4);
+        border: 4px solid rgba(255, 100, 100, 0.8); border-radius: 50%;
         display: flex; justify-content: center; align-items: center;
-        font-size: 24px; font-weight: bold;
-        margin-right: 20px;
+        font-size: 24px; z-index: 20; pointer-events: auto;
+        user-select: none;
     }
-    .action-btn:active { background: rgba(255, 50, 50, 0.6); transform: scale(0.95); }
+    #action-btn:active { background: rgba(255, 50, 50, 0.8); transform: scale(0.95); }
 
+    /* メッセージボックス */
+    .msg-box {
+        position: absolute; bottom: 180px; left: 50%; transform: translateX(-50%);
+        width: 80%; background: rgba(0,0,0,0.9); border: 2px solid #fff; border-radius: 8px;
+        padding: 10px; font-size: 18px; display: none; text-align: center; pointer-events: none;
+    }
 </style>
 </head>
 <body>
 
 <div id="game-wrapper">
     <canvas id="gameCanvas" width="800" height="600"></canvas>
-    
+
     <div id="ui-layer">
         <div class="status-bar">
             <span>LV:<span id="ui-lv">1</span></span>
-            <span>HP:<span id="ui-hp">100</span></span>
-            <span>¥:<span id="ui-money">1000</span></span>
+            <span>¥:<span id="ui-money">3000</span></span>
         </div>
+        <div id="loc-name" class="location-name">マップ: ???</div>
+        <div id="menu-btn" onclick="sys.toggleMenu()">≡</div>
         <div id="msg-box" class="msg-box"></div>
     </div>
 
-    <div id="touch-controls">
-        <div class="dpad-area">
-            <div class="dbtn btn-u" onpointerdown="input.setDir(0)" onpointerup="input.stopDir()" onpointerleave="input.stopDir()"></div>
-            <div class="dbtn btn-d" onpointerdown="input.setDir(2)" onpointerup="input.stopDir()" onpointerleave="input.stopDir()"></div>
-            <div class="dbtn btn-l" onpointerdown="input.setDir(3)" onpointerup="input.stopDir()" onpointerleave="input.stopDir()"></div>
-            <div class="dbtn btn-r" onpointerdown="input.setDir(1)" onpointerup="input.stopDir()" onpointerleave="input.stopDir()"></div>
+    <div id="stick-container">
+        <div id="stick-knob"></div>
+    </div>
+    
+    <div id="action-btn" onpointerdown="input.setAction()" onpointerup="input.stopAction()">A</div>
+
+    <div id="menu-screen">
+        <div class="menu-title">MENU</div>
+        <div class="menu-list">
+            <div class="menu-item" onclick="sys.showStatus()">ステータス・スキル</div>
+            <div class="menu-item" onclick="sys.doGacha()">人生ガチャ (¥500)</div>
+            <div class="menu-item" onclick="sys.toggleMenu()">閉じる</div>
         </div>
-        <div class="action-btn" onpointerdown="input.setAction()" onpointerup="input.stopAction()">A</div>
+        <div id="menu-msg"></div>
+    </div>
+
+    <div id="gacha-result" onclick="this.style.display='none'">
+        <div class="rarity" id="g-rarity">SSR</div>
+        <div class="item-name" id="g-name">伝説の有給休暇</div>
+        <div style="font-size:14px; color:#666;">(画面タップで閉じる)</div>
     </div>
 </div>
 
 <script>
 /**
- * ほうせいRPG4 High-Res Engine
- * ドット絵生成システム＆アニメーション
+ * ほうせいRPG4 Part2 (Integrated & Fixed Joystick)
  */
 
-const CFG = {
-    TILE_SIZE: 48, // 解像度アップ
-    SCREEN_W: 800,
-    SCREEN_H: 600,
-    MAP_W: 50,
-    MAP_H: 50,
-    SPEED: 4 // 移動速度
+const CFG = { TILE: 48, SCR_W: 800, SCR_H: 600, MAP_W: 40, MAP_H: 30, SPEED: 5 };
+
+// --- データ定義 (スキル & ガチャ) ---
+const SKILLS = [
+    { id: 1, name: "定時退社ダッシュ", mp: 10, desc: "全ての敵から確実に逃げる" },
+    { id: 2, name: "虚無の構え", mp: 5, desc: "精神ダメージを無効化する" },
+    { id: 3, name: "カフェイン過剰摂取", mp: 8, desc: "攻撃力が倍になるがHPが減る" }
+];
+
+const GACHA_TABLE = [
+    { r: "N",  rate: 50, name: "ポケットティッシュ" },
+    { r: "N",  rate: 50, name: "使い捨てカイロ" },
+    { r: "R",  rate: 30, name: "栄養ドリンク(強)" },
+    { r: "SR", rate: 9,  name: "ボーナス一封" },
+    { r: "SSR", rate: 1, name: "伝説のホワイト企業内定" }
+];
+
+// --- タイル定義 (Part1から継承) ---
+const T = { GRASS: 0, WATER: 1, TREE: 2, ROAD: 3, BUILD: 4, OFFICE: 5, SHOP: 10, CAMP: 11 };
+const TILE_INFO = {
+    [T.GRASS]: { color: '#4caf50', walk: true },
+    [T.WATER]: { color: '#2196f3', walk: false },
+    [T.TREE]:  { color: '#2e7d32', walk: false },
+    [T.ROAD]:  { color: '#757575', walk: true },
+    [T.BUILD]: { color: '#546e7a', walk: false },
+    [T.OFFICE]:{ color: '#37474f', walk: false },
+    [T.SHOP]:  { color: '#ff9800', walk: false },
+    [T.CAMP]:  { color: '#8bc34a', walk: false }
 };
 
-const TILES = {
-    GRASS: { id: 0, color: '#4caf50', walk: true },
-    WATER: { id: 1, color: '#2196f3', walk: false },
-    WALL:  { id: 2, color: '#795548', walk: false },
-    FLOOR: { id: 3, color: '#9e9e9e', walk: true },
-    SHOP:  { id: 10, color: '#ff9800', walk: false },
-    HOME:  { id: 11, color: '#e91e63', walk: false }
-};
-
-// --- Sprite Generator (High Resolution Pixel Art) ---
-// 画像を使わず、文字配列からドット絵を生成する関数
+// --- グラフィック生成 ---
 const Sprites = {};
-
-function createPixelSprite(key, width, height, palette, pixelData) {
+function createAsset(key, color, pattern) {
     const c = document.createElement('canvas');
-    c.width = width * 4; // 内部解像度を上げておいて縮小表示（あるいはそのまま）
-    c.height = height * 4;
+    c.width = CFG.TILE; c.height = CFG.TILE;
     const ctx = c.getContext('2d');
-    const dotSize = 4; // 1ドットの大きさ
-
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-            const colorIndex = parseInt(pixelData[y][x]);
-            if (colorIndex > 0) {
-                ctx.fillStyle = palette[colorIndex];
-                ctx.fillRect(x * dotSize, y * dotSize, dotSize, dotSize);
-            }
-        }
+    ctx.fillStyle = color; ctx.fillRect(0,0,CFG.TILE,CFG.TILE);
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    if(pattern === 'brick') {
+        for(let i=0; i<4; i++) ctx.fillRect(0, i*12, 48, 2);
+        for(let i=0; i<4; i++) ctx.fillRect(i*12 + (i%2)*6, 0, 2, 48);
+    } else if(pattern === 'tree') {
+        ctx.fillStyle = '#1b5e20'; ctx.beginPath(); ctx.arc(24, 24, 16, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#2e7d32'; ctx.beginPath(); ctx.arc(24, 20, 12, 0, Math.PI*2); ctx.fill();
+    } else if(pattern === 'road') {
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.setLineDash([5, 5]); ctx.strokeRect(10, 10, 28, 28);
     }
     Sprites[key] = c;
 }
 
 function initGraphics() {
-    // パレット: 0:透, 1:黒線, 2:肌, 3:服青, 4:服水, 5:靴, 6:髪
-    const pPal = [null, '#222', '#ffcc80', '#1565c0', '#42a5f5', '#5d4037', '#3e2723'];
-    
-    // プレイヤー正面 (12x12ドット)
-    const pDataWait = [
-        "000000000000",
-        "000066660000",
-        "000666666000",
-        "000622226000",
-        "000212212000", // 目
-        "000222222000",
-        "000333333000",
-        "003433334300",
-        "003433334300",
-        "000333333000",
-        "000330033000",
-        "005550055500"
-    ];
-    createPixelSprite('player_wait', 12, 12, pPal, pDataWait);
-
-    // プレイヤー歩き1 (右足出し)
-    const pDataWalk1 = [...pDataWait];
-    pDataWalk1[10] = "000330000000"; // 左足残し
-    pDataWalk1[11] = "005550005500"; // 右足上げ
-    createPixelSprite('player_walk1', 12, 12, pPal, pDataWalk1);
-
-    // プレイヤー歩き2 (左足出し)
-    const pDataWalk2 = [...pDataWait];
-    pDataWalk2[10] = "000000033000"; 
-    pDataWalk2[11] = "005500055500";
-    createPixelSprite('player_walk2', 12, 12, pPal, pDataWalk2);
-
-    // マップチップ：草 (12x12)
-    // 0:透, 1:濃緑, 2:薄緑
-    const gPal = [null, '#388e3c', '#81c784']; 
-    const gData = [
-        "222222222222",
-        "221222221222",
-        "211122211122",
-        "221222221222",
-        "222222222222",
-        "222212222222",
-        "222111222222",
-        "222212222222",
-        "222222222222",
-        "212222212222",
-        "111222111222",
-        "212222212222"
-    ];
-    createPixelSprite('grass', 12, 12, gPal, gData);
-    
-    // レンガ壁
-    const wPal = [null, '#5d4037', '#8d6e63', '#a1887f'];
-    const wData = [
-        "222222122222",
-        "223332123332",
-        "223332123332",
-        "111111111111",
-        "221222222122",
-        "321233332123",
-        "321233332123",
-        "111111111111",
-        "222221222222",
-        "233321233332",
-        "233321233332",
-        "111111111111"
-    ];
-    createPixelSprite('wall', 12, 12, wPal, wData);
+    createAsset('grass', '#4caf50', null);
+    createAsset('water', '#2196f3', null);
+    createAsset('tree',  '#4caf50', 'tree');
+    createAsset('road',  '#616161', 'road');
+    createAsset('build', '#607d8b', 'brick');
 }
 
-// --- Game State ---
-const state = {
-    player: {
-        x: 5 * CFG.TILE_SIZE,
-        y: 5 * CFG.TILE_SIZE,
-        dir: 2, // 0:上, 1:右, 2:下, 3:左
-        moving: false,
-        animFrame: 0, // 0~3 (アニメーション用)
-        animTimer: 0
-    },
-    camera: { x: 0, y: 0 },
-    map: []
+// --- マップ生成 (Part1のロジック維持) ---
+const maps = {
+    city: { data: [], name: "第13ブラック市街" },
+    wild: { data: [], name: "現実逃避の森" }
 };
 
-// --- Core Systems ---
-function generateMap() {
+function generateMaps() {
+    // 街
+    const cm = [];
     for(let y=0; y<CFG.MAP_H; y++) {
         let row = [];
         for(let x=0; x<CFG.MAP_W; x++) {
-            if(x===0 || x===CFG.MAP_W-1 || y===0 || y===CFG.MAP_H-1) row.push(TILES.WALL.id);
-            else {
-                let r = Math.random();
-                if(r < 0.05) row.push(TILES.WALL.id);
-                else if(r < 0.1) row.push(TILES.WATER.id);
-                else row.push(TILES.GRASS.id);
-            }
+            let id = T.BUILD;
+            if(x%6===0 || y%6===0) id = T.ROAD;
+            if(x===0 || y===0 || y===CFG.MAP_H-1) id = T.BUILD;
+            if(x === CFG.MAP_W-1 && y > 10 && y < 20) id = T.ROAD; // 出口
+            row.push(id);
         }
-        state.map.push(row);
+        cm.push(row);
     }
-    state.map[6][6] = TILES.SHOP.id;
-    state.map[8][8] = TILES.HOME.id;
+    cm[6][6] = T.SHOP; cm[12][12] = T.OFFICE;
+    maps.city.data = cm;
+
+    // 森
+    const wm = [];
+    for(let y=0; y<CFG.MAP_H; y++) {
+        let row = [];
+        for(let x=0; x<CFG.MAP_W; x++) {
+            let r = Math.random();
+            let id = (r < 0.2) ? T.TREE : (r < 0.25) ? T.WATER : T.GRASS;
+            if(x === 0 && y > 10 && y < 20) id = T.GRASS; // 入口
+            if(y===0 || y===CFG.MAP_H-1 || x===CFG.MAP_W-1) id = T.TREE;
+            row.push(id);
+        }
+        wm.push(row);
+    }
+    wm[15][25] = T.CAMP;
+    maps.wild.data = wm;
 }
 
+// --- 入力システム (固定ジョイスティック) ---
 const input = {
-    dir: -1, // -1:なし, 0~3:方向
+    x: 0, y: 0, // -1.0 ~ 1.0
     action: false,
-    setDir: function(d) { this.dir = d; },
-    stopDir: function() { this.dir = -1; },
-    setAction: function() { this.action = true; },
-    stopAction: function() { this.action = false; }
+    setAction: () => input.action = true,
+    stopAction: () => input.action = false
 };
 
-// PCキーボード対応
-window.addEventListener('keydown', e => {
-    if(e.key === 'ArrowUp') input.setDir(0);
-    if(e.key === 'ArrowDown') input.setDir(2);
-    if(e.key === 'ArrowLeft') input.setDir(3);
-    if(e.key === 'ArrowRight') input.setDir(1);
-    if(e.key === 'z' || e.key === 'Enter') input.setAction();
-});
-window.addEventListener('keyup', e => {
-    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) input.stopDir();
-    if(e.key === 'z' || e.key === 'Enter') input.stopAction();
-});
+function initJoystick() {
+    const stick = document.getElementById('stick-container');
+    const knob = document.getElementById('stick-knob');
+    const maxDist = 45; // スティックの可動半径
 
-function update() {
-    const p = state.player;
-    let dx = 0, dy = 0;
-
-    // 入力処理
-    if (input.dir !== -1) {
-        p.dir = input.dir;
-        if(p.dir === 0) dy = -CFG.SPEED;
-        if(p.dir === 2) dy = CFG.SPEED;
-        if(p.dir === 3) dx = -CFG.SPEED;
-        if(p.dir === 1) dx = CFG.SPEED;
+    const handleMove = (e) => {
+        e.preventDefault();
+        // コンテナの中心座標
+        const rect = stick.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
         
+        // タッチ位置
+        const clientX = e.targetTouches ? e.targetTouches[0].clientX : e.clientX;
+        const clientY = e.targetTouches ? e.targetTouches[0].clientY : e.clientY;
+
+        const dx = clientX - centerX;
+        const dy = clientY - centerY;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        // ベクトル計算
+        let limitedDist = Math.min(dist, maxDist);
+        let angle = Math.atan2(dy, dx);
+        
+        // データの正規化
+        input.x = (Math.cos(angle) * limitedDist) / maxDist;
+        input.y = (Math.sin(angle) * limitedDist) / maxDist;
+        
+        // 中心付近の不感帯
+        if (dist < 5) { input.x = 0; input.y = 0; }
+
+        // 見た目の更新
+        knob.style.transform = `translate(calc(-50% + ${Math.cos(angle)*limitedDist}px), calc(-50% + ${Math.sin(angle)*limitedDist}px))`;
+    };
+
+    const resetStick = () => {
+        input.x = 0; input.y = 0;
+        knob.style.transform = `translate(-50%, -50%)`;
+    };
+
+    stick.addEventListener('touchstart', handleMove, {passive: false});
+    stick.addEventListener('touchmove', handleMove, {passive: false});
+    stick.addEventListener('touchend', resetStick);
+    
+    // PC用マウス対応
+    let isDragging = false;
+    stick.addEventListener('mousedown', (e) => { isDragging = true; handleMove(e); });
+    window.addEventListener('mousemove', (e) => { if(isDragging) handleMove(e); });
+    window.addEventListener('mouseup', () => { isDragging = false; resetStick(); });
+}
+
+// --- システムロジック (メニュー・ガチャ) ---
+const state = {
+    currentMapKey: 'city',
+    player: { x: 300, y: 300, dir: 2, money: 3000, anim: 0 },
+    camera: { x: 0, y: 0 },
+    isMenuOpen: false
+};
+
+const sys = {
+    updateUI: function() {
+        document.getElementById('ui-money').innerText = state.player.money;
+    },
+    toggleMenu: function() {
+        state.isMenuOpen = !state.isMenuOpen;
+        document.getElementById('menu-screen').style.display = state.isMenuOpen ? 'flex' : 'none';
+        document.getElementById('menu-msg').innerText = "";
+    },
+    showStatus: function() {
+        let text = "【習得スキル】\n";
+        SKILLS.forEach(s => text += `・${s.name} (MP:${s.mp})\n  ${s.desc}\n`);
+        document.getElementById('menu-msg').innerText = text;
+    },
+    doGacha: function() {
+        if(state.player.money < 500) {
+            document.getElementById('menu-msg').innerText = "金が足りない...世知辛い...";
+            return;
+        }
+        state.player.money -= 500;
+        this.updateUI();
+
+        let total = 0; GACHA_TABLE.forEach(i => total += i.rate);
+        let rand = Math.random() * total;
+        let result = GACHA_TABLE[GACHA_TABLE.length-1];
+        for(let item of GACHA_TABLE) {
+            rand -= item.rate;
+            if(rand <= 0) { result = item; break; }
+        }
+        
+        document.getElementById('g-rarity').innerText = result.r;
+        document.getElementById('g-rarity').style.color = result.r === 'SSR' ? '#ffd700' : '#000';
+        document.getElementById('g-name').innerText = result.name;
+        document.getElementById('gacha-result').style.display = 'flex';
+    }
+};
+
+function changeMap(key, tx, ty) {
+    state.currentMapKey = key;
+    state.player.x = tx * CFG.TILE;
+    state.player.y = ty * CFG.TILE;
+    document.getElementById('loc-name').innerText = maps[key].name;
+}
+
+// --- ゲームループ ---
+function update() {
+    if(state.isMenuOpen) return;
+
+    const p = state.player;
+    let dx = input.x * CFG.SPEED;
+    let dy = input.y * CFG.SPEED;
+    
+    // 向き更新
+    if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
         p.moving = true;
+        p.anim += 0.2;
+        if(Math.abs(dx) > Math.abs(dy)) p.dir = (dx > 0) ? 1 : 3;
+        else p.dir = (dy > 0) ? 2 : 0;
     } else {
         p.moving = false;
-        p.animFrame = 0; // 止まったら棒立ち
+        p.anim = 0;
     }
 
-    // 移動と衝突判定
-    if (dx !== 0 || dy !== 0) {
-        const margin = 12; // 当たり判定のマージン
+    // 移動とマップ切り替え
+    if (p.moving) {
         const nextX = p.x + dx;
         const nextY = p.y + dy;
-        
-        // 四隅チェック
+        const margin = 12;
+
+        // マップ切り替え判定
+        let tx = Math.floor(nextX / CFG.TILE);
+        if(state.currentMapKey === 'city' && tx >= CFG.MAP_W - 1) {
+            changeMap('wild', 1, 15); return;
+        }
+        if(state.currentMapKey === 'wild' && tx <= 0) {
+            changeMap('city', CFG.MAP_W - 2, 15); return;
+        }
+
+        // 衝突判定
         const check = (x, y) => {
-            let tx = Math.floor(x / CFG.TILE_SIZE);
-            let ty = Math.floor(y / CFG.TILE_SIZE);
+            let tx = Math.floor(x/CFG.TILE); let ty = Math.floor(y/CFG.TILE);
             if(tx<0||tx>=CFG.MAP_W||ty<0||ty>=CFG.MAP_H) return false;
-            let tid = state.map[ty][tx];
-            return Object.values(TILES).find(t=>t.id===tid).walk;
+            let tid = maps[state.currentMapKey].data[ty][tx];
+            return TILE_INFO[tid] ? TILE_INFO[tid].walk : false;
         };
 
-        let canMove = 
-            check(nextX + margin, nextY + margin) &&
-            check(nextX + CFG.TILE_SIZE - margin, nextY + margin) &&
-            check(nextX + margin, nextY + CFG.TILE_SIZE - margin) &&
-            check(nextX + CFG.TILE_SIZE - margin, nextY + CFG.TILE_SIZE - margin);
-
-        if (canMove) {
-            p.x = nextX;
-            p.y = nextY;
-            
-            // アニメーション更新
-            p.animTimer++;
-            if(p.animTimer > 8) { // 8フレームごとに足踏み
-                p.animTimer = 0;
-                p.animFrame = (p.animFrame + 1) % 4; // 0, 1, 2, 3 のループ
-                // 0:静止, 1:右足, 2:静止, 3:左足 というサイクルにする
-            }
+        if(check(nextX+margin, nextY+margin) && check(nextX+CFG.TILE-margin, nextY+CFG.TILE-margin)) {
+            p.x = nextX; p.y = nextY;
         }
     }
 
     // カメラ
-    state.camera.x = p.x - CFG.SCREEN_W/2 + CFG.TILE_SIZE/2;
-    state.camera.y = p.y - CFG.SCREEN_H/2 + CFG.TILE_SIZE/2;
-    state.camera.x = Math.max(0, Math.min(state.camera.x, CFG.MAP_W * CFG.TILE_SIZE - CFG.SCREEN_W));
-    state.camera.y = Math.max(0, Math.min(state.camera.y, CFG.MAP_H * CFG.TILE_SIZE - CFG.SCREEN_H));
+    state.camera.x = Math.max(0, Math.min(p.x - CFG.SCR_W/2, CFG.MAP_W*CFG.TILE - CFG.SCR_W));
+    state.camera.y = Math.max(0, Math.min(p.y - CFG.SCR_H/2, CFG.MAP_H*CFG.TILE - CFG.SCR_H));
 
     if(input.action) {
-        checkEvent();
+        const cx = p.x + CFG.TILE/2, cy = p.y + CFG.TILE/2;
+        const tx = Math.floor(cx/CFG.TILE), ty = Math.floor(cy/CFG.TILE);
+        const tid = maps[state.currentMapKey].data[ty][tx];
+        
+        const msg = document.getElementById('msg-box');
+        let text = "";
+        if(tid === T.SHOP) text = "コンビニだ。¥500でガチャが引けるらしい。";
+        else if(tid === T.OFFICE) text = "会社だ...入りたくない...";
+        else if(tid === T.CAMP) text = "焚き火を見て心を落ち着かせよう。";
+        
+        if(text) {
+            msg.style.display = 'block'; msg.innerHTML = text;
+            setTimeout(()=>msg.style.display='none', 2000);
+        }
         input.action = false;
     }
 }
 
-function checkEvent() {
-    const p = state.player;
-    let tx = Math.floor((p.x + CFG.TILE_SIZE/2) / CFG.TILE_SIZE);
-    let ty = Math.floor((p.y + CFG.TILE_SIZE/2) / CFG.TILE_SIZE);
-    // 向いている方角
-    if(p.dir===0) ty--; if(p.dir===2) ty++;
-    if(p.dir===3) tx--; if(p.dir===1) tx++;
-
-    if(tx<0||tx>=CFG.MAP_W||ty<0||ty>=CFG.MAP_H) return;
-    const tid = state.map[ty][tx];
-    
-    const msg = document.getElementById('msg-box');
-    if(tid === TILES.SHOP.id) {
-        msg.style.display = 'block';
-        msg.innerHTML = "コンビニだ。<br>深夜バイト募集中 (時給950円)";
-    } else if(tid === TILES.HOME.id) {
-        msg.style.display = 'block';
-        msg.innerHTML = "実家だ。<br>お母さん「あんた、いつ働くの？」";
-    } else {
-        msg.style.display = 'none';
-    }
-}
-
-// --- Render ---
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+// --- 描画 ---
+const ctx = document.getElementById('gameCanvas').getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
 function draw() {
-    // 背景
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0,0,CFG.SCREEN_W, CFG.SCREEN_H);
+    ctx.fillStyle = '#000'; ctx.fillRect(0,0,CFG.SCR_W, CFG.SCR_H);
+    const m = maps[state.currentMapKey].data;
+    const cam = state.camera;
+    
+    // マップ
+    const sx = Math.floor(cam.x/CFG.TILE), ex = sx + (CFG.SCR_W/CFG.TILE)+1;
+    const sy = Math.floor(cam.y/CFG.TILE), ey = sy + (CFG.SCR_H/CFG.TILE)+1;
 
-    // タイル描画
-    const startX = Math.floor(state.camera.x / CFG.TILE_SIZE);
-    const endX = startX + (CFG.SCREEN_W / CFG.TILE_SIZE) + 1;
-    const startY = Math.floor(state.camera.y / CFG.TILE_SIZE);
-    const endY = startY + (CFG.SCREEN_H / CFG.TILE_SIZE) + 1;
-
-    for(let y=startY; y<=endY; y++) {
-        for(let x=startX; x<=endX; x++) {
+    for(let y=sy; y<=ey; y++) {
+        for(let x=sx; x<=ex; x++) {
             if(y>=0 && y<CFG.MAP_H && x>=0 && x<CFG.MAP_W) {
-                let tid = state.map[y][x];
-                let px = Math.floor(x * CFG.TILE_SIZE - state.camera.x);
-                let py = Math.floor(y * CFG.TILE_SIZE - state.camera.y);
+                let tid = m[y][x];
+                let px = Math.floor(x*CFG.TILE - cam.x), py = Math.floor(y*CFG.TILE - cam.y);
                 
-                // 画像描画 (48x48に拡大して描画)
-                if(tid === TILES.GRASS.id) ctx.drawImage(Sprites.grass, px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
-                else if(tid === TILES.WALL.id) ctx.drawImage(Sprites.wall, px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
-                else {
-                    let c = Object.values(TILES).find(t=>t.id===tid).color;
-                    ctx.fillStyle = c;
-                    ctx.fillRect(px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
-                }
+                if(tid === T.ROAD) ctx.drawImage(Sprites.road, px, py);
+                else if(tid === T.BUILD) ctx.drawImage(Sprites.build, px, py);
+                else if(tid === T.TREE) ctx.drawImage(Sprites.tree, px, py);
+                else if(tid === T.GRASS) ctx.drawImage(Sprites.grass, px, py);
+                else if(tid === T.WATER) ctx.drawImage(Sprites.water, px, py);
+                else if(tid === T.SHOP) { ctx.fillStyle='#ff9800'; ctx.fillRect(px,py,48,48); }
+                else { ctx.fillStyle = TILE_INFO[tid]?TILE_INFO[tid].color:'#f0f'; ctx.fillRect(px,py,48,48); }
             }
         }
     }
 
-    // プレイヤー描画
-    const px = Math.floor(state.player.x - state.camera.x);
-    const py = Math.floor(state.player.y - state.camera.y);
+    // プレイヤー
+    const px = Math.floor(state.player.x - cam.x);
+    const py = Math.floor(state.player.y - cam.y);
+    const bob = Math.sin(state.player.anim * Math.PI) * 3;
     
-    // アニメーションフレーム選択
-    // サイクル: 0(静) -> 1(右足) -> 2(静) -> 3(左足)
-    let spriteName = 'player_wait';
-    if(state.player.animFrame === 1) spriteName = 'player_walk1';
-    if(state.player.animFrame === 3) spriteName = 'player_walk2';
-    
-    // 影
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    ctx.beginPath();
-    ctx.ellipse(px+24, py+40, 16, 6, 0, 0, Math.PI*2);
-    ctx.fill();
-
-    // キャラ本体
-    // 向きによって反転させたいが、今回は簡易的に全て正面素材を使用
-    // (本格的にするならSpritesにRight/Backを追加する)
-    ctx.drawImage(Sprites[spriteName], px, py, CFG.TILE_SIZE, CFG.TILE_SIZE);
+    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(px+24, py+40, 14, 6, 0, 0, Math.PI*2); ctx.fill(); // 影
+    ctx.fillStyle = '#ffcc80'; ctx.fillRect(px+12, py+10+bob, 24, 20); // 顔
+    ctx.fillStyle = '#1565c0'; ctx.fillRect(px+10, py+30+bob, 28, 16); // 服
+    // 目
+    ctx.fillStyle = '#000';
+    let eyes = (state.player.dir===1) ? [32] : (state.player.dir===3) ? [12] : [16, 28];
+    eyes.forEach(e => ctx.fillRect(px+e, py+16+bob, 4, 4));
 }
 
-function loop() {
-    update();
-    draw();
-    requestAnimationFrame(loop);
-}
+function loop() { update(); draw(); requestAnimationFrame(loop); }
 
-window.onload = function() {
-    // 画面サイズ調整
-    const fit = () => {
-        const wrap = document.getElementById('game-wrapper');
-        // CSSでobject-fit管理しているので、Canvas解像度は固定でOK
-    };
-    window.addEventListener('resize', fit);
-    
+window.onload = () => {
     initGraphics();
-    generateMap();
+    generateMaps();
+    initJoystick();
+    document.getElementById('loc-name').innerText = maps.city.name;
     loop();
 };
-
 </script>
 </body>
 </html>

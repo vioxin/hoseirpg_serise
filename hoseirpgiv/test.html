@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ほうせいRPG4 Part2</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
+
+    :root { --bg-color: #121212; --accent: #ffd700; }
+    body {
+        background: var(--bg-color); margin: 0; height: 100vh; width: 100vw;
+        overflow: hidden; font-family: 'DotGothic16', sans-serif; color: white;
+        touch-action: none; user-select: none;
+        display: flex; justify-content: center; align-items: center;
+    }
+
+    #game-wrapper {
+        position: relative; width: 100%; height: 100%; background: #000;
+    }
+    canvas { width: 100%; height: 100%; image-rendering: pixelated; }
+
+    /* UIレイヤー */
+    #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+    
+    /* ステータスバー */
+    .status-bar {
+        position: absolute; top: 10px; left: 10px; right: 80px;
+        background: rgba(0,0,0,0.8); border: 2px solid #fff; border-radius: 8px;
+        padding: 5px 15px; display: flex; gap: 15px; font-size: 18px; pointer-events: auto;
+    }
+
+    /* メニューボタン */
+    #menu-btn {
+        position: absolute; top: 10px; right: 10px;
+        width: 50px; height: 50px; background: #444; border: 2px solid #fff;
+        border-radius: 8px; font-size: 24px; display: flex;
+        justify-content: center; align-items: center; cursor: pointer; pointer-events: auto;
+    }
+    #menu-btn:active { background: #666; }
+
+    /* 全画面メニュー（ガチャなど） */
+    #menu-screen {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.9); z-index: 100; display: none;
+        flex-direction: column; align-items: center; padding-top: 50px; pointer-events: auto;
+    }
+    .menu-title { font-size: 32px; color: var(--accent); margin-bottom: 20px; border-bottom: 2px solid var(--accent); }
+    .menu-list { width: 80%; display: flex; flex-direction: column; gap: 10px; }
+    .menu-item {
+        background: #333; padding: 15px; border: 1px solid #fff; font-size: 20px; cursor: pointer;
+    }
+    .menu-item:active { background: var(--accent); color: #000; }
+    
+    /* ガチャ演出用 */
+    #gacha-result {
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        width: 300px; height: 400px; background: #fff; color: #000;
+        border: 8px double #000; display: none; flex-direction: column;
+        align-items: center; justify-content: center; z-index: 200;
+        animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes popIn { from { transform: translate(-50%, -50%) scale(0); } to { transform: translate(-50%, -50%) scale(1); } }
+    .rarity { font-size: 40px; font-weight: bold; margin-bottom: 10px; }
+    .item-name { font-size: 24px; text-align: center; margin-bottom: 20px; }
+
+    /* ジョイスティック（触ったときだけ出る） */
+    #joystick-area {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;
+        pointer-events: auto;
+    }
+    #virtual-stick-bg {
+        position: absolute; width: 100px; height: 100px;
+        background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%; display: none; pointer-events: none;
+    }
+    #virtual-stick-knob {
+        position: absolute; width: 40px; height: 40px;
+        background: rgba(255, 215, 0, 0.5); border-radius: 50%;
+        display: none; pointer-events: none; transform: translate(-50%, -50%);
+    }
+
+    /* アクションボタン（右下） */
+    #action-btn {
+        position: absolute; bottom: 30px; right: 30px;
+        width: 80px; height: 80px; background: rgba(255, 50, 50, 0.4);
+        border: 4px solid rgba(255, 100, 100, 0.8); border-radius: 50%;
+        display: flex; justify-content: center; align-items: center;
+        font-size: 20px; z-index: 20; pointer-events: auto;
+    }
+    #action-btn:active { background: rgba(255, 50, 50, 0.8); transform: scale(0.95); }
+</style>
+</head>
+<body>
+
+<div id="game-wrapper">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div class="status-bar">
+            <span>LV:<span id="ui-lv">1</span></span>
+            <span>¥:<span id="ui-money">3000</span></span>
+        </div>
+        <div id="menu-btn" onclick="sys.toggleMenu()">≡</div>
+    </div>
+
+    <div id="joystick-area"></div>
+    <div id="virtual-stick-bg"></div>
+    <div id="virtual-stick-knob"></div>
+    
+    <div id="action-btn" onpointerdown="input.action=true" onpointerup="input.action=false">A</div>
+
+    <div id="menu-screen">
+        <div class="menu-title">MENU</div>
+        <div class="menu-list">
+            <div class="menu-item" onclick="sys.doGacha()">人生ガチャ (¥500)</div>
+            <div class="menu-item" onclick="sys.showSkills()">スキル確認</div>
+            <div class="menu-item" onclick="sys.toggleMenu()">閉じる</div>
+        </div>
+        <div id="menu-msg" style="margin-top:20px; color:#aaa;"></div>
+    </div>
+
+    <div id="gacha-result" onclick="this.style.display='none'">
+        <div class="rarity" id="g-rarity">SSR</div>
+        <div class="item-name" id="g-name">伝説の有給休暇</div>
+        <div style="font-size:14px; color:#666;">(タップで閉じる)</div>
+    </div>
+</div>
+
+<script>
+/**
+ * ほうせいRPG4 Part2 Engine
+ * - Virtual Joystick
+ * - Gacha System
+ * - Skill Data
+ */
+
+const CFG = { TILE: 48, SPEED: 5 };
+
+// --- 1. Data Definitions (Skills & Items) ---
+const SKILLS = [
+    { id: 1, name: "定時退社ダッシュ", mp: 10, desc: "戦闘から確実に逃げる" },
+    { id: 2, name: "パワハラ耐性", mp: 0, desc: "精神ダメージを軽減" },
+    { id: 3, name: "カフェイン過剰摂取", mp: 5, desc: "攻撃力を一時的にアップ" }
+];
+
+const GACHA_TABLE = [
+    { r: "N",  rate: 60, name: "ポケットティッシュ" },
+    { r: "N",  rate: 60, name: "ビニール傘" },
+    { r: "R",  rate: 30, name: "栄養ドリンク(強)" },
+    { r: "R",  rate: 30, name: "ちょっと良い椅子" },
+    { r: "SR", rate: 9,  name: "ボーナス一封" },
+    { r: "SSR", rate: 1, name: "伝説のホワイト企業内定" } // 1%
+];
+
+// --- 2. Input System (Virtual Joystick) ---
+const input = {
+    x: 0, y: 0, // -1.0 〜 1.0
+    active: false,
+    action: false,
+    
+    // Joystick UI Elements
+    bg: document.getElementById('virtual-stick-bg'),
+    knob: document.getElementById('virtual-stick-knob'),
+    area: document.getElementById('joystick-area'),
+    
+    startX: 0, startY: 0, maxDist: 40,
+
+    init: function() {
+        this.area.addEventListener('pointerdown', e => {
+            this.active = true;
+            this.startX = e.clientX;
+            this.startY = e.clientY;
+            
+            // Show Joystick at touch point
+            this.bg.style.display = 'block';
+            this.bg.style.left = (this.startX - 50) + 'px';
+            this.bg.style.top = (this.startY - 50) + 'px';
+            this.knob.style.display = 'block';
+            this.moveKnob(e.clientX, e.clientY);
+        });
+
+        window.addEventListener('pointermove', e => {
+            if(!this.active) return;
+            
+            const dx = e.clientX - this.startX;
+            const dy = e.clientY - this.startY;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            // 入力ベクトルの正規化
+            if(dist > 0) {
+                const limitedDist = Math.min(dist, this.maxDist);
+                const scale = limitedDist / this.maxDist; // 0.0 ~ 1.0
+                const angle = Math.atan2(dy, dx);
+                
+                this.x = Math.cos(angle) * scale;
+                this.y = Math.sin(angle) * scale;
+                
+                // Knobの表示位置更新
+                const kx = this.startX + Math.cos(angle) * limitedDist;
+                const ky = this.startY + Math.sin(angle) * limitedDist;
+                this.moveKnob(kx, ky);
+            }
+        });
+
+        window.addEventListener('pointerup', () => this.reset());
+        window.addEventListener('pointercancel', () => this.reset());
+    },
+
+    moveKnob: function(x, y) {
+        this.knob.style.left = x + 'px';
+        this.knob.style.top = y + 'px';
+    },
+
+    reset: function() {
+        this.active = false;
+        this.x = 0; this.y = 0;
+        this.bg.style.display = 'none';
+        this.knob.style.display = 'none';
+    }
+};
+
+// --- 3. System Logic (Menu & Gacha) ---
+const state = {
+    player: { x: 400, y: 300, dir: 2, money: 3000, skills: [] },
+    camera: { x: 0, y: 0 },
+    isMenuOpen: false
+};
+
+const sys = {
+    updateUI: function() {
+        document.getElementById('ui-money').innerText = state.player.money;
+    },
+    
+    toggleMenu: function() {
+        state.isMenuOpen = !state.isMenuOpen;
+        document.getElementById('menu-screen').style.display = state.isMenuOpen ? 'flex' : 'none';
+        document.getElementById('menu-msg').innerText = "";
+    },
+
+    doGacha: function() {
+        if(state.player.money < 500) {
+            document.getElementById('menu-msg').innerText = "金が足りない...世知辛い...";
+            return;
+        }
+        state.player.money -= 500;
+        this.updateUI();
+
+        // ガチャ抽選ロジック
+        let total = 0;
+        GACHA_TABLE.forEach(i => total += i.rate);
+        let rand = Math.random() * total;
+        let result = null;
+        
+        for(let item of GACHA_TABLE) {
+            rand -= item.rate;
+            if(rand <= 0) { result = item; break; }
+        }
+        
+        // 結果表示
+        const resEl = document.getElementById('gacha-result');
+        const rEl = document.getElementById('g-rarity');
+        rEl.innerText = result.r;
+        rEl.style.color = result.r === 'SSR' ? '#ffd700' : (result.r === 'SR' ? '#c0c0c0' : '#000');
+        document.getElementById('g-name').innerText = result.name;
+        resEl.style.display = 'flex';
+    },
+
+    showSkills: function() {
+        let text = "【習得スキル】\n";
+        SKILLS.forEach(s => text += `・${s.name}: ${s.desc}\n`);
+        document.getElementById('menu-msg').innerText = text;
+    }
+};
+
+// --- 4. Game Loop & Renderer ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let mapData = [];
+
+function initMap() {
+    // 簡易マップ生成（無限ループ風）
+    for(let y=0; y<50; y++) {
+        let row = [];
+        for(let x=0; x<50; x++) {
+            row.push((Math.random() < 0.1) ? 1 : 0); // 0:草, 1:木
+        }
+        mapData.push(row);
+    }
+}
+
+function update() {
+    if(state.isMenuOpen) return;
+
+    // ジョイスティック入力による移動
+    if(input.active) {
+        state.player.x += input.x * CFG.SPEED;
+        state.player.y += input.y * CFG.SPEED;
+        
+        // 向き判定（簡易）
+        if(Math.abs(input.x) > Math.abs(input.y)) {
+            state.player.dir = input.x > 0 ? 1 : 3;
+        } else {
+            state.player.dir = input.y > 0 ? 2 : 0;
+        }
+    }
+
+    // カメラ更新
+    state.camera.x = state.player.x - canvas.width / 2;
+    state.camera.y = state.player.y - canvas.height / 2;
+}
+
+function draw() {
+    // リサイズ対応
+    if(canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+        canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight;
+    }
+
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // マップ描画
+    const cx = Math.floor(state.camera.x / CFG.TILE);
+    const cy = Math.floor(state.camera.y / CFG.TILE);
+    const cw = Math.ceil(canvas.width / CFG.TILE) + 1;
+    const ch = Math.ceil(canvas.height / CFG.TILE) + 1;
+
+    for(let y=cy; y<cy+ch; y++) {
+        for(let x=cx; x<cx+cw; x++) {
+            if(y>=0 && y<50 && x>=0 && x<50) {
+                let px = Math.floor(x * CFG.TILE - state.camera.x);
+                let py = Math.floor(y * CFG.TILE - state.camera.y);
+                
+                if(mapData[y][x] === 0) {
+                    ctx.fillStyle = '#4caf50'; ctx.fillRect(px,py,CFG.TILE,CFG.TILE); // 草
+                } else {
+                    ctx.fillStyle = '#2e7d32'; ctx.fillRect(px,py,CFG.TILE,CFG.TILE); // 木
+                    ctx.fillStyle = '#1b5e20'; ctx.beginPath(); ctx.arc(px+24,py+24,16,0,Math.PI*2); ctx.fill();
+                }
+            }
+        }
+    }
+
+    // プレイヤー描画
+    const px = state.player.x - state.camera.x;
+    const py = state.player.y - state.camera.y;
+    
+    // 影
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath(); ctx.ellipse(px, py+20, 16, 8, 0, 0, Math.PI*2); ctx.fill();
+
+    // 本体（簡易ドット）
+    ctx.fillStyle = '#ffcc80'; ctx.fillRect(px-12, py-24, 24, 24); // 頭
+    ctx.fillStyle = '#1565c0'; ctx.fillRect(px-10, py, 20, 20);   // 体
+    
+    // 目（向きに合わせて移動）
+    ctx.fillStyle = '#000';
+    let eyeX = (state.player.dir === 1) ? 4 : (state.player.dir === 3) ? -4 : 0;
+    ctx.fillRect(px-6+eyeX, py-16, 4, 4);
+    ctx.fillRect(px+2+eyeX, py-16, 4, 4);
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+// 起動処理
+window.onload = function() {
+    input.init();
+    initMap();
+    sys.updateUI();
+    loop();
+};
+
+</script>
+</body>
+</html>
